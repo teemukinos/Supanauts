@@ -1,0 +1,41 @@
+# Local conversation history and studio material
+COMMUNITY-SESSIONS.md
+private/
+assets/
+logs/
+out/
+3d/
+.studio/
+.local/
+brief.md
+direction.md
+plan.md
+# Secrets and runtime output
+.env*
+**/.env*
+!site/.env.example
+**/node_modules/
+**/.next/
+**/dist/
+*.tsbuildinfo
+.DS_Store
+*.log
+# Original event media must not enter repository history
+site/public/media/
+*.csv
+*.xlsx
+*.zip
+*.mp4
+*.mov
+*.blend
+# Owner policy: tests and verification workflows remain local
+.github/workflows/
+**/__tests__/
+**/tests/
+**/*.test.*
+**/*.spec.*
+scripts/check-*
+scripts/capture*
+scripts/verify-*
+playwright-report/
+test-results/
