@@ -1,0 +1,2 @@
+import {claimError,json,memberClient} from '../../../../lib/community';
+export async function GET(){try{const client=await memberClient();if(!client)return json({error:'Sign in to see your rewards.'},401);const {data,error}=await client.rpc('community_my_rewards');if(error)return claimError(error.message);const admin=await client.rpc('community_admin_status');return json({...data,is_admin:admin.data===true});}catch{return json({error:'Rewards are temporarily unavailable.'},503);}}

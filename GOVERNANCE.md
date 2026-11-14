@@ -28,3 +28,7 @@ Wait for the owner's explicit public-release instruction. Before changing visibi
 6. Publish contribution instructions. Website deployment and domain changes remain separate actions.
 
 Do not test protection by attempting destructive pushes. Verify settings through read-only GitHub API responses. Do not automatically merge the initial application PR.
+
+## Current protection status — 14 November 2026
+
+The private repository was created successfully. GitHub rejected enabling main-branch protection with HTTP 403: “Upgrade to GitHub Pro or make this repository public to enable this feature.” The repository remains private; no upgrade or visibility change was made. PR-only changes are currently a maintainer convention, not an enforced rule. Only the owner has write access. Squash-only merges and disabled auto-merge are configured. Activate protection when the account supports it or at the explicitly authorized public launch.
