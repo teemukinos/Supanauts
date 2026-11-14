@@ -64,3 +64,7 @@ npm run build
 ```
 
 Also check mobile layout, keyboard navigation, reduced motion and pause controls in a local browser. Synthetic behavioral tests and their evidence remain local under the owner's repository policy. No remote tests, CI workflows, publishing jobs or deployment integration are included.
+
+## Participation features
+
+Migration `202611140003_participation.sql` adds projects and immutable approved revisions, content drafts, private upload metadata, notification jobs, moderation, reporting, import previews, event calendars and aggregate metrics. See [`docs/PARTICIPATION-RELEASE.md`](../docs/PARTICIPATION-RELEASE.md) for setup, operation, verification limits, media-host requirements and release gates. All data and provider setup remains in your own Supabase project. Real email dispatch defaults to off.

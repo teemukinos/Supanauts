@@ -1,0 +1,4 @@
+import {adminClient,authClient,json,memberClient} from '../../../../lib/community';
+import {uuid} from '../../../../lib/validation';
+export const runtime='nodejs';
+export async function GET(req:Request,{params}:{params:Promise<{id:string}>}){try{const id=uuid((await params).id);const client=await memberClient()||authClient();const {data,error}=await client.rpc('community_media_access',{p_id:id});if(error||!data)return json({error:'Not found.'},404);const file=await adminClient().storage.from('community-quarantine').download(data.path);if(file.error||!file.data)return json({error:'Media unavailable.'},404);return new Response(file.data,{headers:{'Content-Type':data.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Disposition':'inline'}});}catch{return json({error:'Media unavailable.'},404);}}
