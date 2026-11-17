@@ -1,0 +1,16 @@
+'use client';
+import EventPhoto from './event-photo';
+import {useEffect,useState} from 'react';
+/** Original editorial collage with small illustrated community details. */
+const moments=[{city:'Helsinki',file:'helsinki-10.5.webp',alt:'A builder working on a laptop at the Helsinki meetup'},{city:'Dublin',file:'dublin-12.webp',alt:'A close-up of a builder typing at the Dublin meetup'},{city:'Helsinki',file:'helsinki-15.webp',alt:'A builder working on a laptop at the Helsinki meetup'},{city:'Dublin',file:'dublin-21.webp',alt:'A builder working at the Dublin meetup'},{city:'Helsinki',file:'helsinki-21.webp',alt:'The Helsinki meetup group together'},{city:'Dublin',file:'dublin-7.5.webp',alt:'Builders gathered at the Dublin meetup'}];
+export default function CartoonWorld(){const [moment,setMoment]=useState(0),[paused,setPaused]=useState(false);
+ useEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)');const sync=()=>setPaused(media.matches||document.documentElement.dataset.motion==='paused');sync();media.addEventListener('change',sync);const observer=new MutationObserver(sync);observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-motion']});return()=>{media.removeEventListener('change',sync);observer.disconnect();};},[]);
+ useEffect(()=>{if(paused||!process.env.NEXT_PUBLIC_EVENT_MEDIA_BASE_URL)return;const timer=setInterval(()=>{if(document.visibilityState==='visible')setMoment(i=>(i+1)%moments.length);},5000);return()=>clearInterval(timer);},[paused]);
+ const current=moments[moment];
+ return <div className="community-collage event-still-collage">
+<div className="collage-orbit" aria-hidden="true"><i/><i/></div><div className="print-back back-one" aria-hidden="true"/><div className="print-back back-two" aria-hidden="true"/>
+<div className="photo-print event-still-print"><EventPhoto priority key={moment} className="moment-image event-still-image" file={current.file} alt={current.alt}/><span className="mono">{process.env.NEXT_PUBLIC_EVENT_MEDIA_BASE_URL?current.city.toUpperCase()+' / FROM THE MEETUP':'SUPANAUTS / COMMUNITY ILLUSTRATION'}</span></div>
+<svg className="little-spark astronaut-patch" viewBox="0 0 120 140" fill="none" aria-hidden="true"><path d="M59 4 103 24l10 59-27 42-52 5L8 88 16 28Z" fill="#baa6ed" stroke="#101017" strokeWidth="3"/><path d="M48 76 34 99l-12-6m51-17 18 22 13-5M48 102l-6 20m27-20 7 18" stroke="#101017" strokeWidth="7" strokeLinecap="round"/><rect x="37" y="68" width="44" height="42" rx="16" fill="#f3f5ef" stroke="#101017" strokeWidth="3"/><circle cx="59" cy="47" r="30" fill="#f3f5ef" stroke="#101017" strokeWidth="3"/><rect x="36" y="34" width="46" height="25" rx="12" fill="#163e30" stroke="#101017" strokeWidth="3"/><path d="m43 41 9-2" stroke="#3ecf8e" strokeWidth="3" strokeLinecap="round"/><circle cx="53" cy="47" r="2" fill="#3ecf8e"/><circle cx="68" cy="47" r="2" fill="#3ecf8e"/><path d="m49 87 8 6 13-13" stroke="#101017" strokeWidth="3"/><path d="m101 10 2 6 7 2-7 3-2 6-2-6-6-3 6-2Z" fill="#3ecf8e"/></svg>
+<div className="collage-note">AFTER THE MEETUP:<br/><strong>Keep building together.</strong><svg viewBox="0 0 140 20" aria-hidden="true"><path d="M2 14Q60 2 135 7m-9-5 10 5-9 7" stroke="currentColor" strokeWidth="2" fill="none"/></svg></div>
+
+</div>}

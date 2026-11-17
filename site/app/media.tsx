@@ -1,0 +1,3 @@
+'use client';
+import {useEffect,useState} from 'react';
+export function Media({id,title}:{id:string;title:string}){const [type,setType]=useState('');useEffect(()=>{let active=true;fetch('/api/media/'+id,{method:'HEAD'}).then(r=>{if(active&&r.ok)setType(r.headers.get('content-type')||'');});return ()=>{active=false;};},[id]);return type.startsWith('video/')?<video className="project-media" src={'/api/media/'+id} controls preload="metadata" aria-label={title}/>:type.startsWith('image/')?<img className="project-media" src={'/api/media/'+id} alt={title}/>:<p className="fineprint">Media unavailable or loading.</p>}

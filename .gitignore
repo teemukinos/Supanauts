@@ -39,3 +39,6 @@ scripts/capture*
 scripts/verify-*
 playwright-report/
 test-results/
+
+# Generated Next.js declarations
+site/next-env.d.ts
