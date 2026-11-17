@@ -1,11 +1,32 @@
 import CartoonWorld from './cartoon-world';
-import {ProjectPlaceholders,RewardAvailability,DateLabel,ItemCard,MotionControl,SiteFooter,SiteHeader,WhatsAppLinks} from './community-ui';
+import EventFilms from './event-films';
+import {PhotoHighlights} from './archive-cards';
+import {hasMeetupAnnouncement,nextMeetupAnnouncement} from '../lib/community-content';
+import {RewardAvailability,DateLabel,ItemCard,MotionControl,SiteFooter,SiteHeader,WhatsAppLinks} from './community-ui';
 import {publicCommunity} from '../lib/participation';
 export const dynamic='force-dynamic';
-export default async function Home(){const data=await publicCommunity();const events=data.content.filter(x=>x.kind==='event');const upcoming=events.filter(x=>x.data.starts_at&&Date.parse(x.data.starts_at)>=Date.now()).sort((a,b)=>Date.parse(a.data.starts_at!)-Date.parse(b.data.starts_at!));const past=events.filter(x=>!x.data.starts_at||Date.parse(x.data.starts_at)<Date.now());const stories=data.content.filter(x=>x.kind==='story').sort((a,b)=>b.published_at.localeCompare(a.published_at));const next=upcoming[0];return <><SiteHeader/><main id="main"><MotionControl/><section className="hero"><div className="hero-top mono"><span><i/> MEETUPS. PROJECTS. PEOPLE.</span><span>INDEPENDENT. UNOFFICIAL. TOGETHER.</span></div><div className="hero-body"><div className="headline"><p className="eyebrow">AN UNOFFICIAL SUPABASE COMMUNITY</p><h1>MEET PEOPLE.<br/><em>BUILD THINGS.</em></h1><p className="intro">Meet other people building with Supabase.<br/>Share your work, learn together, and keep in touch after the meetup.</p><div className="hero-actions"><a className="primary" href="/join">Join the community ↗</a><a href="/member">Already registered? Sign in</a></div><div className="hero-next"><span className="eyebrow">NEXT MEETUP</span>{next?<a href={'/events/'+next.slug}>{next.data.title} · <DateLabel value={next.data.starts_at} timezone={next.data.timezone}/> ↗</a>:<><p>Details will appear here when confirmed.</p><a href="/community">Stay connected ↗</a></>}</div></div><CartoonWorld/></div></section>
-<section className="section" id="projects"><div className="section-heading"><div><p className="eyebrow">MADE BY THIS COMMUNITY</p><h2>SHARE WHAT<br/><span>YOU’RE BUILDING.</span></h2></div><p>Share finished projects and work in progress.<br/>Find ideas, useful lessons and people to build with.</p></div>{data.projects.length?<div className="card-grid">{data.projects.slice(0,3).map(x=><ItemCard key={x.id} item={x} kind="project"/>)}</div>:data.unavailable&&!data.preview?<p role="status">Projects are temporarily unavailable.</p>:<ProjectPlaceholders/>}<div className="actions"><a className="primary" href="/projects/new">Share your project ↗</a><a href="/projects">Explore projects</a></div>{stories.length>0?<><h3 className="subheading">Latest updates</h3><div className="card-grid">{stories.slice(0,3).map(x=><ItemCard key={x.id} item={x} kind="story"/>)}</div></>:<div className="compact-empty"><p className="eyebrow">UPDATES · COMING SOON</p><p>Meetup recaps and builder stories will appear here.</p></div>}</section>
-<section className="section next-section" id="events"><div className="section-heading"><div><p className="eyebrow">GET TOGETHER</p><h2>THE NEXT MEETUP.</h2></div><a href="/events">All events ↗</a></div>{upcoming.length?<div className="card-grid">{upcoming.slice(0,3).map(x=><ItemCard key={x.id} item={x} kind="event"/>)}</div>:<p>We’ll publish the date, venue and registration link once confirmed. Join the community to stay connected.</p>}</section>
-<section className="section tour"><div className="section-heading"><div><p className="eyebrow">PREVIOUS MEETUPS</p><h2>KEEP THE<br/><span>CONVERSATION GOING.</span></h2></div><a href="/events">Browse the archive ↗</a></div>{past.length?<div className="card-grid">{past.slice(0,3).map(x=><ItemCard key={x.id} item={x} kind="event"/>)}</div>:<p>Meetup recaps are being prepared from the original event materials. Only verified details and approved media will be published.</p>}</section>
-<section className="section" id="community"><p className="eyebrow">TAKE PART</p><h2>FIND YOUR PEOPLE.</h2><div className="participation-grid"><WhatsAppLinks links={data.whatsapp}/><div className="channel-card"><h3>Share your project</h3><p>Show what you made and what you learned. Tell other builders where you could use a hand.</p><a href="/projects/new">Start a submission ↗</a></div><div className="channel-card"><h3>Host a meetup</h3><p>Have a venue, a local group or an idea for your city?</p><a href="/community#host">Offer to help ↗</a></div></div></section>
-<section className="section rewards-overview"><p className="eyebrow">COMMUNITY REWARDS</p><h2>HELP FOR<br/><span>YOUR NEXT BUILD.</span></h2><p>Credits, T-shirt vouchers and contributor swag have separate eligibility. Sign in to see your offers and existing codes.</p><RewardAvailability initial={data}/><a className="primary" href="/member">View your rewards ↗</a></section>
-<section className="section supporters"><p className="eyebrow">PEOPLE WHO MAKE IT HAPPEN</p><h2>BUILT TOGETHER.</h2><p>Meetup organizers, speakers, venues and contributors are credited on each event page. Those roles do not imply sponsorship of Supanauts.</p><a href="/events">See event contributors ↗</a><p>Organized by <a href="mailto:teemu@skene.ai">Teemu Kinos</a>.</p></section></main><SiteFooter/></>}
+
+export default async function Home(){
+  const data=await publicCommunity();
+  const next=data.content.filter(x=>x.kind==='event'&&x.data.starts_at&&Date.parse(x.data.starts_at)>=Date.now()).sort((a,b)=>Date.parse(a.data.starts_at!)-Date.parse(b.data.starts_at!))[0];
+  return <><SiteHeader/><main id="main" className="home-compact"><MotionControl/>
+    <section className="hero">
+      <div className="hero-body"><div className="headline">
+        <p className="eyebrow">AN UNOFFICIAL SUPABASE COMMUNITY</p>
+        <h1>BUILD WITH<br/><em>SUPABASE.</em></h1>
+        <p className="intro">Supanauts is an independent community for Supabase developers. Join local meetups, share your projects, and keep learning from each other after the event.</p>
+        <div className="hero-actions"><a className="primary" href="/join">Join the community ↗</a></div>
+        <div className="hero-next">{next?<a href={'/events/'+next.slug}>Next meetup · <DateLabel value={next.data.starts_at} timezone={next.data.timezone}/> ↗</a>:hasMeetupAnnouncement()?<a href="#whatsapp">Next meetup · <time dateTime={nextMeetupAnnouncement.month}>{nextMeetupAnnouncement.label}</time> ↗</a>:<a href="/events">Explore meetups ↗</a>}</div>
+      </div><CartoonWorld/></div>
+    </section>
+    <EventFilms/>
+    <PhotoHighlights/>
+    <section className="section project-invitation" id="projects">
+      <div><h2>Built something with Supabase?</h2>{!data.projects.length&&<p>Share your demo, what you learned, or where you’re stuck.</p>}</div>
+      {data.projects.length>0&&<div className="card-grid">{data.projects.slice(0,3).map(x=><ItemCard key={x.id} item={x} kind="project"/>)}</div>}
+      <a className="primary" href="/projects/new">Share your project ↗</a>
+    </section>
+    <section className="section stay-connected" id="whatsapp"><div><h2>Between meetups.</h2><a className="host-link" href="https://supabase.com/open-source/contributing/supasquad">Host a meetup ↗</a></div><WhatsAppLinks compact/></section>
+    <section className="reward-strip" aria-label="Community rewards"><div className="reward-intro"><h2>Credits. Swag. A little extra.</h2><p>From time to time, we share Supabase credits, T-shirts and swag with eligible community members.</p></div><RewardAvailability initial={data} compact/><a href="/member">Your rewards ↗</a></section>
+  </main><SiteFooter/></>;
+}

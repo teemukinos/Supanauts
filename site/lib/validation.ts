@@ -1,4 +1,4 @@
-export function safeNext(value:unknown){return typeof value==='string'&&/^\/(?:projects\/new|member(?:\/profile)?)(?:\?id=[a-f0-9-]{36})?$/.test(value)?value:'/member';}
+export function safeNext(value:unknown){return typeof value==='string'&&/^\/(?:projects\/new|member(?:\/(?:profile|community))?)(?:\?id=[a-f0-9-]{36})?$/.test(value)?value:'/member';}
 export function text(value:unknown,max=5000){if(typeof value!=='string'||value.length>max)throw Error('Invalid text.');return value.trim();}
 export function url(value:unknown){if(!value)return '';const v=text(value,1000);const u=new URL(v);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw Error('Use a public HTTP or HTTPS link.');return u.toString();}
 export function uuid(value:unknown){if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))throw Error('Invalid identifier.');return value;}

@@ -42,7 +42,11 @@ The current upload route accepts multipart uploads on a Node host with a 105 MB 
 
 ## Notification delivery
 
-Configure a verified sender, custom Supabase SMTP, SPF/DKIM/DMARC and Resend transactional API credentials only after authorization. Authentication delivery and moderation notification delivery are separate paths. `EMAIL_FROM`, `RESEND_API_KEY` and `NOTIFICATIONS_ENABLED=true` enable explicit queue dispatch.
+Login delivery uses the server-side Resend API directly. Set `RESEND_API_KEY` and `LOGIN_EMAIL_FROM` to a sender on your verified Resend domain. The login endpoint checks membership and rate limits before asking Supabase Auth to generate an OTP; Resend transports that OTP. Supabase still verifies the code and issues the session. The signup allowlist hook, organizer MFA, and reward allocator remain unchanged. Never expose the generated OTP, link, or either provider credential in API responses or logs. No custom Supabase SMTP is required for this login path. Direct calls to Supabase's public OTP endpoint still use its separately configured sender.
+
+Authentication delivery and moderation notification delivery are separate paths. `EMAIL_FROM`, `RESEND_API_KEY` and `NOTIFICATIONS_ENABLED=true` enable explicit queue dispatch. Login delivery does not enable decision emails. Keep preview credentials restricted to the owner-controlled application branch; add production credentials separately when authorizing production release. Changing Vercel environment variables requires a new deployment.
+
+References: [Supabase generateLink](https://supabase.com/docs/reference/javascript/auth-admin-generatelink), [Resend send email](https://resend.com/docs/api-reference/emails/send-email).
 
 Jobs are created atomically with membership/project decisions. A delivery failure never reverses approval. A stable job ID is the provider idempotency key. Retries of ambiguous attempts stop after 23 hours from the **first** attempt, because Resend retains keys for 24 hours. Reconcile with the provider before attempting any later delivery; there is no automatic reset. Source: https://resend.com/docs/dashboard/emails/idempotency-keys
 
@@ -82,3 +86,26 @@ Not yet verified: actual deployed SMTP, a production membership approval, produc
 ## Owner direction: placeholders for now
 
 Use clearly labeled placeholders for projects, WhatsApp invitations and upcoming-event details. These inputs are not required for the current visual review. Replace placeholders only with verified content and publication permissions. Do not simulate stock or enable invitation/registration links before their real destinations exist.
+
+## Final photo and submission pass — 14 November 2026
+The owner authorized use of previous-event photographs on the website. Five Helsinki images are exported with Pixelmator as 1600-pixel WebP derivatives, without EXIF, and supplied separately under `site/public/media/`. They remain excluded from Git and Apache licensing. Set `NEXT_PUBLIC_EVENT_MEDIA_BASE_URL=/media` when packaging those authorized files; a clone without the media configuration uses the original illustration fallback. The hero shows one photo at a time, and the gallery lazy-loads later photographs.
+
+The project call now explains what to submit and offers copyable invitation text. No invitations are automatically sent to registrants or WhatsApp. Publication and promotional permissions still come from each maker’s submission.
+
+## Event films and shorter homepage — 15 November 2026
+
+The homepage now leads from a compact introduction into three portrait films, followed by project submission, one WhatsApp invitation and live reward availability. Detailed event listings remain on Events; submission instructions and the copyable invitation remain on Projects. December is month-only. Local visible homepage copy fell from 434 to 123 words before expanding descriptions or revealing the invitation.
+
+Media is packaged separately from Git. The owner authorized these existing event films for the website; this does not grant an Apache redistribution licence. Sources and review evidence are recorded in the Studio job. Original films and embedded titles/logos are untouched. Pixelmator produced portrait posters. Compressor exports exceeded the required source-size ceiling; bounded FFmpeg H.264/AAC derivatives provide the documented fallback, with fast-start playback and no upscaling. Film descriptions identify the montage content and music. No recorded-talk transcript is represented by unverified automatic song lyrics.
+
+Local checks cover all three films, keyboard selection, one active player, no MP4 request before Play, stable player dimensions, 390px overflow, error/retry, reduced motion, global pause, WhatsApp acknowledgement and reward availability states. Type checking and production build pass. Authentication, membership approvals, project moderation and the immutable reward allocator are unchanged. No database migration, real notification, GitHub push, PR merge or production promotion accompanies this review deployment.
+
+## Member-only invitations and header stills — 15 November 2026 (local candidate)
+
+WhatsApp now has a dedicated `/member/community` page. Public HTML, public JSON and browser bundles carry no invitation. The server-only `WHATSAPP_COMMUNITY_URL` supplies the default; organizer settings can override it. The authenticated channels RPC rechecks verified email and active membership. Phone-number visibility acknowledgement remains required before displaying links. Login preserves the destination. Migration `202611150004_private_channels.sql` removes invitations from the anonymous RPC and adds the protected read; it does not modify rewards or assignments.
+
+The header cycles six documentary frames from Helsinki and Dublin every five seconds. Global pause, reduced motion and background tabs stop automatic rotation. Native event films still load only after Play. The homepage explains occasional credits, T-shirts and swag; the credit counter uses actual database availability. The current connected database contains one assigned swag box and no credit inventory, so no historical credit count is presented as currently claimable stock.
+
+Release requires applying migration 004, configuring the server-only invitation and deploying the review candidate. No remote write has been performed for this candidate. Local SQL access checks, browser checks, type checking and build passed. A credit inventory migration remains a separate reconciliation/cutover task.
+
+Access rollout authorization received on 15 November 2026. Migration 004 is now applied to the dedicated Supanauts project. The private invitation is configured as a sensitive Vercel environment variable for the review branch. Before/after database readback confirms Teemu's original claim, inventory ID, timestamp and code fingerprint remain unchanged; total inventory and claims are both one. Anonymous execution of the channels RPC is denied and public channel data is empty. No reward was claimed or reassigned during rollout.
