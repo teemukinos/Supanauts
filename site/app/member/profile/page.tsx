@@ -1,5 +1,108 @@
 'use client';
-import MemberNav from '../member-nav';
-import '../../account.css';
-import {useEffect,useState} from 'react';import {SiteFooter,SiteHeader} from '../../community-ui';
-export default function Page(){const [profile,setProfile]=useState({name:'',link:'',decision_email:true}),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);useEffect(()=>{fetch('/api/community/home').then(async r=>{if(r.status===401){window.location.assign('/member?next=/member/profile');return;}const d=await r.json();if(!r.ok)throw Error(d.error);setProfile(p=>({...p,...d.profile}));setReady(true);}).catch(e=>setNotice(e.message));},[]);return <div className="account-shell"><SiteHeader accountLabel="My account"/><main id="main" className="public-page detail-page"><MemberNav/><h1>Profile & preferences</h1><p>These defaults are private. Each project separately asks permission to display maker attribution.</p>{ready&&<form className="standard-form" onSubmit={async e=>{e.preventDefault();setBusy(true);try{const r=await fetch('/api/community/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(profile)});const d=await r.json();setNotice(r.ok?'Preferences saved.':d.error);}catch{setNotice('Could not save. Retry.');}finally{setBusy(false);}}}><label>Maker name<input value={profile.name} maxLength={100} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><label>Public profile link<input type="url" value={profile.link} onChange={e=>setProfile({...profile,link:e.target.value})}/></label><label className="check"><input type="checkbox" checked={profile.decision_email} onChange={e=>setProfile({...profile,decision_email:e.target.checked})}/>Email project moderation decisions when delivery is enabled.</label><p>Login and access decisions remain available. No newsletter. WhatsApp participation is managed in WhatsApp.</p><button className="primary" disabled={busy}>{busy?'Saving…':'Save preferences'}</button></form>}{notice&&<p role="status">{notice}</p>}<a href="/member">Back to your community</a></main><SiteFooter/></div>}
+import { useEffect, useState } from 'react';
+import { Button, PageHeader, Loading, ErrorMessage, request, useUnsaved } from '../../../components/app/ui';
+type Profile = { name: string; link: string; decision_email: boolean };
+export default function Page() {
+  const [profile, setProfile] = useState<Profile>({ name: '', link: '', decision_email: true });
+  const [notice, setNotice] = useState(''),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false),
+    [ready, setReady] = useState(false),
+    [dirty, setDirty] = useState(false);
+  useUnsaved(dirty);
+  async function load() {
+    setError('');
+    try {
+      const data = await request<{ profile: Profile | null }>('/api/community/home');
+      setProfile((p) => ({ ...p, ...data.profile }));
+      setReady(true);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  function update(patch: Partial<Profile>) {
+    setProfile((p) => ({ ...p, ...patch }));
+    setDirty(true);
+    setNotice('');
+  }
+  return (
+    <main id="main">
+      <PageHeader
+        title="Profile & preferences"
+        description="Private defaults for your projects and account."
+      />
+      <ErrorMessage error={error} retry={!ready ? load : undefined} />
+      {notice && (
+        <p role="status" className="member-notice">
+          {notice}
+        </p>
+      )}
+      {!ready && !error ? (
+        <Loading />
+      ) : (
+        ready && (
+          <form
+            className="standard-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError('');
+              try {
+                await request('/api/community/profile', profile);
+                setNotice('Preferences saved.');
+                setDirty(false);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <fieldset disabled={busy}>
+              <legend>Maker details</legend>
+              <p>Each project asks permission before displaying this attribution.</p>
+              <label>
+                Maker name
+                <input
+                  value={profile.name}
+                  maxLength={100}
+                  onChange={(e) => update({ name: e.target.value })}
+                />
+              </label>
+              <label>
+                Public profile link
+                <input
+                  type="url"
+                  maxLength={500}
+                  value={profile.link}
+                  onChange={(e) => update({ link: e.target.value })}
+                />
+              </label>
+            </fieldset>
+            <fieldset disabled={busy}>
+              <legend>Email preferences</legend>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={profile.decision_email}
+                  onChange={(e) => update({ decision_email: e.target.checked })}
+                />
+                Email project moderation decisions when delivery is enabled.
+              </label>
+              <p>
+                Login and access messages remain available. This does not subscribe you to a newsletter.
+                Manage WhatsApp participation in WhatsApp.
+              </p>
+            </fieldset>
+            <div>
+              <Button disabled={busy}>{busy ? 'Saving…' : 'Save preferences'}</Button>
+            </div>
+          </form>
+        )
+      )}
+    </main>
+  );
+}

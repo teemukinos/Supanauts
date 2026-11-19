@@ -1,9 +1,76 @@
-import {notFound} from 'next/navigation';import {EnquiryForm,SiteFooter,SiteHeader} from '../../community-ui';
-const pages:Record<string,{title:string;paragraphs:string[]}>= {
-privacy:{title:'Privacy',paragraphs:['Supanauts is an independent community organized by Teemu Kinos. Contact teemu@skene.ai for access, corrections, deletion requests or privacy questions.','We use your registration email, event registration status and source record to establish membership. Registration is not proof of attendance. Applications add your name and reason for joining. We do not publish imported attendee lists.','Signing in uses Supabase email verification and a session cookie. Project drafts, applications, reports and reward codes are private. Only an approved project revision and the attribution you permit become public.','Optional project-decision emails can be disabled in your profile. Login and membership-decision messages support access. There is no newsletter or automatic WhatsApp enrollment.','Member and claim records remain while needed to operate access and prevent duplicate rewards. Published content remains until withdrawn or unpublished. Unpublished drafts and uploads currently require organizer-assisted deletion. Requests are reviewed individually; no automatic deletion schedule is represented as active.','The application uses Supabase for authentication, database and private media. Transactional email delivery is disabled until the organizer configures and authorizes a provider. Hosting and email processor details must be confirmed here before public launch. No advertising trackers or session replay are included.','We record aggregate interaction counts. Member visits are deduplicated by day in private records for up to 90 days to measure returning participation. No public visitor profile, session replay or advertising identifiers are collected.','WhatsApp is an optional external service. Other group participants may see your phone number. External links have their own privacy policies.']},
-conduct:{title:'Community rules',paragraphs:['Welcome people with different experience levels and backgrounds. Discuss ideas respectfully. Harassment, threats, discrimination and deliberate disruption are not welcome.','Do not share private conversations, attendee details, reward codes or someone else’s work without permission. Credit makers and sources.','Keep promotion relevant and transparent. Do not spam, impersonate others or use the community to distribute harmful content.','Report concerns privately using the reporting form. Teemu can remove content, restrict access or decline participation. Contact the organizer to request reconsideration.']},
-rewards:{title:'Reward terms',paragraphs:['Supabase credits, T-shirt vouchers and contributor swag are separate offers. Membership alone does not guarantee eligibility or availability. The offer in your account states the applicable instructions and deadline.','Supabase credits are allocated once per eligible email identity across events and batches. Existing allocations remain assigned. Repeated requests return your existing code.','Swag may be reserved for speakers and contributors. Codes are private and must not be posted publicly. Assignment does not confirm redemption at the provider’s store.','An inventory outage does not mean sold out. We never recycle an assigned code because redemption is unknown. Contact the organizer for corrections.']},
-permissions:{title:'Your content and permissions',paragraphs:['You retain ownership of your submission. Submit only content you own or have permission to share.','Website display permission lets Supanauts publish your approved project description, selected maker attribution and uploaded media. Promotional permission is separate and allows approved share images and draft social copy.','Your draft remains private until organizer approval. Later edits require another approval; the existing approved revision remains public until replaced or withdrawn.','You can withdraw a project from your account. Supanauts then stops serving the public page and media through its site. Previously downloaded files, external shares and third-party caches cannot be recalled automatically.','Event media, fonts and Supabase trademarks retain their own terms. The software license does not transfer rights to those assets.']},
-report:{title:'Report a concern',paragraphs:['Send a private report, correction or takedown request to Teemu. Include the page link and enough detail to investigate. Do not include passwords or reward codes.']}};
-export async function generateMetadata({params}:{params:Promise<{topic:string}>}){return {title:(pages[(await params).topic]?.title||'Help')+' — Supanauts'};}
-export default async function Page({params}:{params:Promise<{topic:string}>}){const {topic}=await params;const page=pages[topic];if(!page)notFound();return <><SiteHeader/><main id="main" className="public-page detail-page"><h1>{page.title}</h1>{page.paragraphs.map(p=><p key={p}>{p}</p>)}{topic==='report'?<EnquiryForm kind="report"/>:<a href="/help/report">Contact the organizer or report a concern ↗</a>}</main><SiteFooter/></>}
+import { notFound } from 'next/navigation';
+import { EnquiryForm, SiteFooter, SiteHeader } from '../../community-ui';
+const pages: Record<string, { title: string; paragraphs: string[] }> = {
+  privacy: {
+    title: 'Privacy',
+    paragraphs: [
+      'Supanauts is an independent community organized by Teemu Kinos. Contact teemu@skene.ai for access, corrections, deletion requests or privacy questions.',
+      'We use your registration email, event registration status and source record to establish membership. Registration is not proof of attendance. Applications add your name and reason for joining. We do not publish imported attendee lists.',
+      'Signing in uses Supabase email verification and a session cookie. Project drafts, applications, reports and reward codes are private. Only an approved project revision and the attribution you permit become public.',
+      'Optional project-decision emails can be disabled in your profile. Login and membership-decision messages support access. There is no newsletter or automatic WhatsApp enrollment.',
+      'Member and claim records remain while needed to operate access and prevent duplicate rewards. Published content remains until withdrawn or unpublished. Unpublished drafts and uploads currently require organizer-assisted deletion. Requests are reviewed individually; no automatic deletion schedule is represented as active.',
+      'The application uses Supabase for authentication, database and private media. The site is hosted on Vercel. Sign-in codes are delivered through Resend; Supabase verifies the codes. Additional application and project-decision notifications are sent when enabled. No advertising trackers or session replay are included.',
+      'We record aggregate interaction counts. Member visits are deduplicated by day in private records for up to 90 days to measure returning participation. No public visitor profile, session replay or advertising identifiers are collected.',
+      'WhatsApp is an optional external service. Other group participants may see your phone number. External links have their own privacy policies.',
+    ],
+  },
+  conduct: {
+    title: 'Community rules',
+    paragraphs: [
+      'Welcome people with different experience levels and backgrounds. Discuss ideas respectfully. Harassment, threats, discrimination and deliberate disruption are not welcome.',
+      'Do not share private conversations, attendee details, reward codes or someone else’s work without permission. Credit makers and sources.',
+      'Keep promotion relevant and transparent. Do not spam, impersonate others or use the community to distribute harmful content.',
+      'Report concerns privately using the reporting form. Teemu can remove content, restrict access or decline participation. Contact the organizer to request reconsideration.',
+    ],
+  },
+  rewards: {
+    title: 'Reward terms',
+    paragraphs: [
+      'Supabase credits, T-shirt vouchers and contributor swag are separate offers. Membership alone does not guarantee eligibility or availability. The offer in your account states the applicable instructions and deadline.',
+      'Supabase credits are allocated once per eligible email identity across events and batches. Existing allocations remain assigned. Repeated requests return your existing code.',
+      'Swag may be reserved for speakers and contributors. Codes are private and must not be posted publicly. Assignment does not confirm redemption at the provider’s store.',
+      'An inventory outage does not mean sold out. We never recycle an assigned code because redemption is unknown. Contact the organizer for corrections.',
+    ],
+  },
+  permissions: {
+    title: 'Your content and permissions',
+    paragraphs: [
+      'You retain ownership of your submission. Submit only content you own or have permission to share.',
+      'Website display permission lets Supanauts publish your approved project description, selected maker attribution and uploaded media. Promotional permission is separate and allows approved share images and draft social copy.',
+      'Your draft remains private until organizer approval. Later edits require another approval; the existing approved revision remains public until replaced or withdrawn.',
+      'You can withdraw a project from your account. Supanauts then stops serving the public page and media through its site. Previously downloaded files, external shares and third-party caches cannot be recalled automatically.',
+      'Event media, fonts and Supabase trademarks retain their own terms. The software license does not transfer rights to those assets.',
+    ],
+  },
+  report: {
+    title: 'Report a concern',
+    paragraphs: [
+      'Send a private report, correction or takedown request to Teemu. Include the page link and enough detail to investigate. Do not include passwords or reward codes.',
+    ],
+  },
+};
+export async function generateMetadata({ params }: { params: Promise<{ topic: string }> }) {
+  return { title: (pages[(await params).topic]?.title || 'Help') + ' — Supanauts' };
+}
+export default async function Page({ params }: { params: Promise<{ topic: string }> }) {
+  const { topic } = await params;
+  const page = pages[topic];
+  if (!page) notFound();
+  return (
+    <>
+      <SiteHeader />
+      <main id="main" className="public-page detail-page">
+        <h1>{page.title}</h1>
+        {page.paragraphs.map((p) => (
+          <p key={p}>{p}</p>
+        ))}
+        {topic === 'report' ? (
+          <EnquiryForm kind="report" />
+        ) : (
+          <a href="/help/report">Contact the organizer or report a concern ↗</a>
+        )}
+      </main>
+      <SiteFooter />
+    </>
+  );
+}
