@@ -1,37 +1,249 @@
-import {communityDefaults} from '../../../../lib/community-channels';
-import {launchCandidates} from '../../../../lib/launch-candidates';
-import {createHash} from 'node:crypto';
-import {adminClient,body,email,json,memberClient,rateLimit,sameOrigin} from '../../../../lib/community';
-import {publicCommunity,siteOrigin} from '../../../../lib/participation';
-import {contentPayload,projectPayload,text,url,uuid} from '../../../../lib/validation';
-export async function GET(req:Request,{params}:{params:Promise<{operation:string}>}){const {operation}=await params;try{if(operation==='public')return json(await publicCommunity());const c=await memberClient();if(!c)return json({error:'Sign in first.'},401);if(operation==='channels'){const {data,error}=await c.rpc('community_member_channels');if(error)return json({error:'Community channels are unavailable. Please try again later.'},403);return json({whatsapp:{...communityDefaults,...data}});}if(operation==='candidates'){const check=await c.rpc('community_admin_workspace');if(check.error)return json({error:'Verify organizer access.'},403);return json(launchCandidates);}
-const name=operation==='workspace'?'community_admin_workspace':operation==='home'?'community_member_home':operation==='metrics'?'community_admin_metrics':null;if(!name)return json({error:'Not found.'},404);const {data,error}=await c.rpc(name);if(error)return json({error:'Access unavailable. Organizer actions require authenticator verification.'},403);return json(operation==='workspace'?{...data,settings:{...data.settings,whatsapp:{...communityDefaults,...data.settings?.whatsapp}}}:data);}catch{return json({error:'Community service is unavailable.'},503);}}
-export async function POST(req:Request,{params}:{params:Promise<{operation:string}>}){try{
- if(!sameOrigin(req))return json({error:'Invalid request origin.'},403);
- const {operation}=await params;const raw=await req.text();if(raw.length>2000000)return json({error:'Request too large.'},413);const p=JSON.parse(raw);
- if(operation==='metric'){if(!['event_registration_click','share_link_copy','share_link_visit'].includes(p.name))throw Error('Invalid metric.');if(!await rateLimit('metric:'+req.headers.get('x-forwarded-for'),30,60))return json({ok:false},429);await adminClient().rpc('community_metric',{p_name:p.name});return json({ok:true});}
- if(operation==='enquiry'){const address=email(p.email);if(!address||!['host','report'].includes(p.kind))throw Error('Add your email and enquiry type.');const message=text(p.message,3000);if(message.length<10)throw Error('Please add more detail.');if(!await rateLimit('enquiry:'+address,3,3600))return json({error:'Please try again later.'},429);const {error}=await adminClient().rpc('community_submit_enquiry',{p_kind:p.kind,p_email:address,p_message:message});if(error)throw Error('Could not save your enquiry.');return json({ok:true});}
- const c=await memberClient();if(!c)return json({error:'Sign in first.'},401);
- if(operation==='visit'){await c.rpc('community_record_visit');return json({ok:true});}
- let rpc='',args:Record<string,unknown>={};
- if(operation==='save-project'){rpc='community_save_project';args={p_id:p.id?uuid(p.id):null,p_payload:projectPayload(p.payload),p_submit:p.submit===true};}
- else if(operation==='withdraw'){rpc='community_withdraw_project';args={p_id:uuid(p.id)};}
- else if(operation==='profile'){rpc='community_save_profile';args={p_name:text(p.name,100),p_link:url(p.link),p_decision_email:p.decision_email===true};}
- else if(operation==='review'){if(!['approved','changes_requested','rejected'].includes(p.decision))throw Error('Invalid decision.');rpc='community_review_project';args={p_id:uuid(p.id),p_decision:p.decision,p_feedback:text(p.feedback,2000)};}
- else if(operation==='admin'){
-  const action=text(p.action,40);let data=p.data;
-  if(action==='content_save'){if(!['event','story'].includes(data.kind)||!/^[a-z0-9][a-z0-9-]{0,99}$/.test(data.slug))throw Error('Choose a valid type and URL slug.');data={kind:data.kind,slug:data.slug,data:contentPayload(data.data),evidence:text(data.evidence,5000)};}
-  else if(action==='settings'){data={community:url(data.community),announcements:url(data.announcements),builders:url(data.builders)};for(const value of Object.values(data))if(value&&new URL(value as string).hostname!=='chat.whatsapp.com')throw Error('Use an official WhatsApp invite link.');}
-  else if(action==='reward_details'){data={family:text(data.family,100),presentation:{eligibility:text(data.presentation.eligibility,500),value:text(data.presentation.value,100),instructions:text(data.presentation.instructions,2000),redemption_url:url(data.presentation.redemption_url),deadline:text(data.presentation.deadline,100)}};}
-  else if(action==='import_preview'){
-   if(!Array.isArray(data.rows)||data.rows.length>5000)throw Error('Import up to 5,000 rows.');const quarantine:unknown[]=[];const rows:unknown[]=[];data.rows.forEach((r:Record<string,unknown>,i:number)=>{const address=email(r.email);if(!address||!r.event||!r.record){quarantine.push({row:i+1,reason:'Email, event and source record required.'});return;}rows.push({email:address,event:text(r.event,200),record:text(r.record,200),status:text(r.status||'unknown',100)});});data={source:text(data.source,200),rows,digest:createHash('sha256').update(JSON.stringify(rows)).digest('hex')};const {data:result,error}=await c.rpc('community_admin_action',{p_action:action,p_data:data});if(error)throw Error('Import preview unavailable. Verify organizer access.');return json({...result,accepted:rows.length,quarantine});
-  }else if(['content_publish','content_unpublish','project_unpublish','resolve','import_commit'].includes(action)){data={id:uuid(data.id)};}
-  else if(action==='share_approve'){data={kind:text(data.kind,20),slug:text(data.slug,100),copy:text(data.copy,5000)};}
-  else throw Error('Unknown action.');rpc='community_admin_action';args={p_action:action,p_data:data};
- }else if(operation==='notify'){
-  if(process.env.NOTIFICATIONS_ENABLED!=='true'||!process.env.RESEND_API_KEY||!process.env.EMAIL_FROM)return json({error:'Real email dispatch is disabled. Configure and authorize launch first.'},409);
-  const id=uuid(p.id);const {data:job,error}=await c.rpc('community_notification_take',{p_id:id});if(error)throw Error('Verify organizer access or reconcile earlier provider delivery.');if(!job)return json({ok:true,message:'Already sent or processing.'});
-  try{const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json','Idempotency-Key':`supanauts-${id}`},body:JSON.stringify({from:process.env.EMAIL_FROM,to:[job.recipient],subject:job.subject,text:job.message+'\n\nOpen your community: '+siteOrigin()+'/member'}),signal:AbortSignal.timeout(15000)});const result=await response.json();if(!response.ok||!result.id)throw Error('Provider did not confirm delivery.');const finish=await c.rpc('community_notification_finish',{p_id:id,p_provider:result.id,p_error:null});if(finish.error)throw Error('Provider accepted; reconciliation required.');return json({ok:true});}catch{await c.rpc('community_notification_finish',{p_id:id,p_provider:null,p_error:'Delivery unconfirmed. Retry uses the same idempotency key.'});return json({error:'Delivery unconfirmed. Inspect provider status before retrying.'},503);}
- }else return json({error:'Not found.'},404);
- const {data,error}=await c.rpc(rpc,args);if(error)return json({error:error.message.includes('MFA_REQUIRED')?'Verify your authenticator first.':error.message.includes('ALREADY_REVIEWED')?'This revision was already reviewed. Refresh the queue.':'Could not save. Check access, required fields and refresh before retrying.'},400);return json({ok:true,result:data});
- }catch(e){return json({error:e instanceof Error?e.message:'Request failed.'},400);}}
+import { communityDefaults } from '../../../../lib/community-channels';
+import { launchCandidates } from '../../../../lib/launch-candidates';
+import { createHash } from 'node:crypto';
+import {
+  adminClient,
+  body,
+  email,
+  json,
+  memberClient,
+  rateLimit,
+  sameOrigin,
+} from '../../../../lib/community';
+import { publicCommunity, siteOrigin } from '../../../../lib/participation';
+import { contentPayload, projectPayload, text, url, uuid } from '../../../../lib/validation';
+export async function GET(req: Request, { params }: { params: Promise<{ operation: string }> }) {
+  const { operation } = await params;
+  try {
+    if (operation === 'public') return json(await publicCommunity());
+    const c = await memberClient();
+    if (!c) return json({ error: 'Sign in first.' }, 401);
+    if (operation === 'channels') {
+      const { data, error } = await c.rpc('community_member_channels');
+      if (error) return json({ error: 'Community channels are unavailable. Please try again later.' }, 403);
+      return json({ whatsapp: { ...communityDefaults, ...data } });
+    }
+    if (operation === 'candidates') {
+      const check = await c.rpc('community_admin_workspace');
+      if (check.error) return json({ error: 'Verify organizer access.' }, 403);
+      return json(launchCandidates);
+    }
+    const name =
+      operation === 'workspace'
+        ? 'community_admin_workspace'
+        : operation === 'home'
+          ? 'community_member_home'
+          : operation === 'metrics'
+            ? 'community_admin_metrics'
+            : null;
+    if (!name) return json({ error: 'Not found.' }, 404);
+    const { data, error } = await c.rpc(name);
+    if (error)
+      return json(
+        { error: 'Access unavailable. Organizer actions require authenticator verification.' },
+        403,
+      );
+    return json(
+      operation === 'workspace'
+        ? {
+            ...data,
+            settings: { ...data.settings, whatsapp: { ...communityDefaults, ...data.settings?.whatsapp } },
+          }
+        : data,
+    );
+  } catch {
+    return json({ error: 'Community service is unavailable.' }, 503);
+  }
+}
+export async function POST(req: Request, { params }: { params: Promise<{ operation: string }> }) {
+  try {
+    if (!sameOrigin(req)) return json({ error: 'Invalid request origin.' }, 403);
+    const { operation } = await params;
+    const raw = await req.text();
+    if (raw.length > 2000000) return json({ error: 'Request too large.' }, 413);
+    const p = JSON.parse(raw);
+    if (operation === 'metric') {
+      if (!['event_registration_click', 'share_link_copy', 'share_link_visit'].includes(p.name))
+        throw Error('Invalid metric.');
+      if (!(await rateLimit('metric:' + req.headers.get('x-forwarded-for'), 30, 60)))
+        return json({ ok: false }, 429);
+      await adminClient().rpc('community_metric', { p_name: p.name });
+      return json({ ok: true });
+    }
+    if (operation === 'enquiry') {
+      const address = email(p.email);
+      if (!address || !['host', 'report'].includes(p.kind)) throw Error('Add your email and enquiry type.');
+      const message = text(p.message, 3000);
+      if (message.length < 10) throw Error('Please add more detail.');
+      if (!(await rateLimit('enquiry:' + address, 3, 3600)))
+        return json({ error: 'Please try again later.' }, 429);
+      const { error } = await adminClient().rpc('community_submit_enquiry', {
+        p_kind: p.kind,
+        p_email: address,
+        p_message: message,
+      });
+      if (error) throw Error('Could not save your enquiry.');
+      return json({ ok: true });
+    }
+    const c = await memberClient();
+    if (!c) return json({ error: 'Sign in first.' }, 401);
+    if (operation === 'visit') {
+      await c.rpc('community_record_visit');
+      return json({ ok: true });
+    }
+    let rpc = '',
+      args: Record<string, unknown> = {};
+    if (operation === 'save-project') {
+      rpc = 'community_save_project';
+      args = {
+        p_id: p.id ? uuid(p.id) : null,
+        p_payload: projectPayload(p.payload),
+        p_submit: p.submit === true,
+      };
+    } else if (operation === 'withdraw') {
+      rpc = 'community_withdraw_project';
+      args = { p_id: uuid(p.id) };
+    } else if (operation === 'profile') {
+      rpc = 'community_save_profile';
+      args = { p_name: text(p.name, 100), p_link: url(p.link), p_decision_email: p.decision_email === true };
+    } else if (operation === 'review') {
+      if (!['approved', 'changes_requested', 'rejected'].includes(p.decision))
+        throw Error('Invalid decision.');
+      rpc = 'community_review_project';
+      args = { p_id: uuid(p.id), p_decision: p.decision, p_feedback: text(p.feedback, 2000) };
+    } else if (operation === 'admin') {
+      const action = text(p.action, 40);
+      let data = p.data;
+      if (action === 'content_save') {
+        if (!['event', 'story'].includes(data.kind) || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(data.slug))
+          throw Error('Choose a valid type and URL slug.');
+        data = {
+          kind: data.kind,
+          slug: data.slug,
+          data: contentPayload(data.data),
+          evidence: text(data.evidence, 5000),
+          version: data.version ?? null,
+        };
+      } else if (action === 'settings') {
+        data = {
+          community: url(data.community),
+          announcements: url(data.announcements),
+          builders: url(data.builders),
+        };
+        for (const value of Object.values(data))
+          if (value && new URL(value as string).hostname !== 'chat.whatsapp.com')
+            throw Error('Use an official WhatsApp invite link.');
+      } else if (action === 'reward_details') {
+        data = {
+          family: text(data.family, 100),
+          presentation: {
+            eligibility: text(data.presentation.eligibility, 500),
+            value: text(data.presentation.value, 100),
+            instructions: text(data.presentation.instructions, 2000),
+            redemption_url: url(data.presentation.redemption_url),
+            deadline: text(data.presentation.deadline, 100),
+          },
+        };
+      } else if (action === 'import_preview') {
+        if (!Array.isArray(data.rows) || data.rows.length > 5000) throw Error('Import up to 5,000 rows.');
+        const quarantine: unknown[] = [];
+        const rows: unknown[] = [];
+        data.rows.forEach((r: Record<string, unknown>, i: number) => {
+          const address = email(r.email);
+          if (!address || !r.event || !r.record) {
+            quarantine.push({ row: i + 1, reason: 'Email, event and source record required.' });
+            return;
+          }
+          rows.push({
+            email: address,
+            event: text(r.event, 200),
+            record: text(r.record, 200),
+            status: text(r.status || 'unknown', 100),
+          });
+        });
+        data = {
+          source: text(data.source, 200),
+          rows,
+          digest: createHash('sha256').update(JSON.stringify(rows)).digest('hex'),
+        };
+        const { data: result, error } = await c.rpc('community_admin_action', {
+          p_action: action,
+          p_data: data,
+        });
+        if (error) throw Error('Import preview unavailable. Verify organizer access.');
+        return json({ ...result, accepted: rows.length, quarantine });
+      } else if (
+        ['content_publish', 'content_unpublish', 'project_unpublish', 'resolve', 'import_commit'].includes(
+          action,
+        )
+      ) {
+        data = { id: uuid(data.id), version: data.version ?? null };
+      } else if (action === 'share_approve') {
+        data = { kind: text(data.kind, 20), slug: text(data.slug, 100), copy: text(data.copy, 5000) };
+      } else throw Error('Unknown action.');
+      rpc = 'community_admin_action';
+      args = { p_action: action, p_data: data };
+    } else if (operation === 'notify') {
+      if (
+        process.env.NOTIFICATIONS_ENABLED !== 'true' ||
+        !process.env.RESEND_API_KEY ||
+        !process.env.EMAIL_FROM
+      )
+        return json({ error: 'Real email dispatch is disabled. Configure and authorize launch first.' }, 409);
+      const id = uuid(p.id);
+      const { data: job, error } = await c.rpc('community_notification_take', { p_id: id });
+      if (error) throw Error('Verify organizer access or reconcile earlier provider delivery.');
+      if (!job) return json({ ok: true, message: 'Already sent or processing.' });
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+            'Idempotency-Key': `supanauts-${id}`,
+          },
+          body: JSON.stringify({
+            from: process.env.EMAIL_FROM,
+            to: [job.recipient],
+            subject: job.subject,
+            text: job.message + '\n\nOpen your community: ' + siteOrigin() + '/member',
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.id) throw Error('Provider did not confirm delivery.');
+        const finish = await c.rpc('community_notification_finish', {
+          p_id: id,
+          p_provider: result.id,
+          p_error: null,
+        });
+        if (finish.error) throw Error('Provider accepted; reconciliation required.');
+        return json({ ok: true });
+      } catch {
+        await c.rpc('community_notification_finish', {
+          p_id: id,
+          p_provider: null,
+          p_error: 'Delivery unconfirmed. Retry uses the same idempotency key.',
+        });
+        return json({ error: 'Delivery unconfirmed. Inspect provider status before retrying.' }, 503);
+      }
+    } else return json({ error: 'Not found.' }, 404);
+    const { data, error } = await c.rpc(rpc, args);
+    if (error)
+      return json(
+        {
+          error: error.message.includes('STALE_VERSION')
+            ? 'Someone changed this draft. Reload before saving.'
+            : error.message.includes('MFA_REQUIRED')
+              ? 'Verify your authenticator first.'
+              : error.message.includes('ALREADY_REVIEWED')
+                ? 'This revision was already reviewed. Refresh the queue.'
+                : 'Could not save. Check access, required fields and refresh before retrying.',
+        },
+        400,
+      );
+    return json({ ok: true, result: data });
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : 'Request failed.' }, 400);
+  }
+}
