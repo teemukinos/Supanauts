@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import Access from '../admin/organizer-access';
+import type { ReactNode } from "react";
 export default function Layout({ children }: { children: ReactNode }) {
-  return <Access>{children}</Access>;
+  return children;
 }

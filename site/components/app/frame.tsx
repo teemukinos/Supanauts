@@ -34,7 +34,6 @@ export type Access = {
   name: string;
   is_admin: boolean;
   is_organizer: boolean;
-  verified: boolean;
   event_ids: string[];
 };
 const memberLinks: [string, string, LucideIcon][] = [

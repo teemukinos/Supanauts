@@ -40,7 +40,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ operatio
     const { data, error } = await c.rpc(name);
     if (error)
       return json(
-        { error: 'Access unavailable. Organizer actions require authenticator verification.' },
+        { error: 'Access unavailable. Check your workspace permissions.' },
         403,
       );
     return json(
@@ -234,11 +234,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ operati
         {
           error: error.message.includes('STALE_VERSION')
             ? 'Someone changed this draft. Reload before saving.'
-            : error.message.includes('MFA_REQUIRED')
-              ? 'Verify your authenticator first.'
-              : error.message.includes('ALREADY_REVIEWED')
-                ? 'This revision was already reviewed. Refresh the queue.'
-                : 'Could not save. Check access, required fields and refresh before retrying.',
+            : error.message.includes('ALREADY_REVIEWED')
+              ? 'This revision was already reviewed. Refresh the queue.'
+              : 'Could not save. Check access, required fields and refresh before retrying.',
         },
         400,
       );

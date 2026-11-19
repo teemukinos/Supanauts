@@ -4,17 +4,17 @@ The organizer registry is available at `/admin/members`, linked from `/admin`, t
 
 ## Finding participants and codes
 
-Open `/admin/members`. If the current browser is signed out, choose **Sign in as organizer** and enter the emailed code. The sign-in flow returns to the requested organizer page. The page then handles authenticator setup or verification inline before showing private controls.
+Open `/admin/members`. If the current browser is signed out, choose **Sign in** and enter the emailed code. The sign-in flow returns to the requested organizer page. Administrators can then use the registry directly. No authenticator setup is required.
 
 Choose **Participants with codes**, then **View codes & details** beside a participant. Assigned codes appear first in the record. **Back to participants** returns to the filtered list. **Reservations without membership** shows recipients whose codes are reserved but whose email has no matching member account. Access and eligibility changes sit behind **Manage access & reward eligibility** in the participant record.
 
 Organizer navigation separates **Members & codes**, **Join requests**, and **Community management**. Participants use `/member`, where **My codes & rewards** appears before projects, with copy and redemption actions beside each assigned code. Account navigation links to profile preferences and community channels.
 
-The access screen distinguishes a signed-out browser, a member without organizer privileges, an organizer awaiting MFA, and an unavailable service. Authentication does not transfer between browsers. No session duration, cookie protection, database permission or MFA requirement is relaxed by this interface.
+The access screen distinguishes a signed-out browser, a member without administrator privileges and an unavailable service. Authentication does not transfer between browsers. Session duration, cookie protection and database role checks remain enforced.
 
 ## Access and records
 
-Every registry RPC requires an active organizer membership and an AAL2 authenticator session. Participants can only retrieve their own registrations and rewards through the existing member endpoints. Private API responses use `Cache-Control: no-store, private`; registry records are never included in the public community endpoint or the SupaSquad directory.
+Every registry RPC requires verified email sign-in, active membership and the administrator role. Participants can only retrieve their own registrations and rewards through the existing member endpoints. Private API responses use `Cache-Control: no-store, private`; registry records are never included in the public community endpoint or the SupaSquad directory.
 
 The list supports email/name search, event, access status, reward and assignment filters, with 50 records per page. The assignment filter applies to the selected reward, or to any reward when no family is selected. Member details include registration source records, assigned codes, original assignment dates and sources, eligibility, and the most recent 100 audit entries. Registration is not proof of attendance, and assignment is not proof of redemption.
 
@@ -48,6 +48,10 @@ For an authorized release, preserve a protected database backup, apply migration
 
 ## Local verification
 
-Synthetic verification lives outside Git under `.local/member-registry/`. No real member data, codes or credentials are used. Local checks cover database permissions, organizer MFA, own-member isolation, legacy matching, pagination and filters, audited mutations, duplicate entry, suspension, eligibility and permanent assignments. Native PostgreSQL checks cover concurrent blocks, claims, suspension, Gmail aliases and final-code allocation. HTTP checks use a local SQL-backed Supabase adapter. Browser checks use that adapter and headless Chrome; authentication-provider behavior is separately stubbed.
+Synthetic verification lives outside Git under `.local/member-registry/`. No real member data, codes or credentials are used. Original registry checks covered database permissions, organizer MFA, own-member isolation, legacy matching, pagination and filters, audited mutations, duplicate entry, suspension, eligibility and permanent assignments. Native PostgreSQL checks cover concurrent blocks, claims, suspension, Gmail aliases and final-code allocation. HTTP checks use a local SQL-backed Supabase adapter. Browser checks use that adapter and headless Chrome; authentication-provider behavior is separately stubbed.
 
 Local checks do not establish delivery through production Resend, production Auth configuration, or deployment status. Production migration, real email, publishing and remote verification remain separate explicitly authorized actions.
+
+## Email-only workspace access
+
+Migration `202611200008_email_workspace_access.sql` removes the authenticator requirement from administrator and assigned-organizer operations. Verified email, active membership, administrator privileges and event assignments remain mandatory. Event organizers cannot access the administrator registry or another organizer’s event. Existing codes and assignments are unchanged. The previous MFA checks above describe historical verification before this policy change.

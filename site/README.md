@@ -35,13 +35,13 @@ select id from community_private.members where email = 'you@example.com'
 on conflict do nothing;
 ```
 
-The email must be lowercase and must belong to you. Sign in through `/member`, then open `/admin` and set up your authenticator. For reward development use only dummy codes in your isolated database, not real Supabase offers. Do not commit your local seed files.
+The email must be lowercase and must belong to you. Sign in through `/member`, then open `/admin`. For reward development use only dummy codes in your isolated database, not real Supabase offers. Do not commit your local seed files.
 
 ## Behavior and interfaces
 
 - `/member`: email OTP, private rewards, existing-code retrieval and logout. Sessions use HttpOnly, SameSite=Strict cookies, expire after one hour and require HTTPS Secure cookies in production.
 - `/join`: rate-limited membership requests. Pending and rejected applicants cannot sign in.
-- `/admin`: organizer-only approval queue requiring a verified AAL2 authenticator session. Approval grants membership only, never automatic swag entitlement or admin rights. No automatic decision email is sent.
+- `/admin`: administrator-only approval queue requiring verified email sign-in and active membership. Approval grants membership only, never automatic swag entitlement or admin rights. No automatic decision email is sent.
 - `/api/auth/request`, `/api/auth/verify`, `/api/auth/logout`: same-origin authentication operations.
 - `/api/rewards/mine`, `/api/rewards/claim`: authenticated own-member reads and atomic, repeatable claims.
 - `/api/access/request`, `/api/admin/requests`, `/api/admin/mfa`: application and approval operations.
@@ -75,4 +75,4 @@ Migration `202611140003_participation.sql` adds projects and immutable approved 
 
 ## Private organizer registry
 
-`/admin/members` provides organizer-only member search, event registrations, assigned codes (including legacy reservations), membership access controls and per-reward eligibility. It requires authenticator verification. Migration `202611190006_member_registry.sql` is required; see [the registry guide](../docs/MEMBER-REGISTRY.md) for interfaces, permissions, migration and rollback details. Participants continue signing in at `/member` and see only their own records.
+`/admin/members` provides administrator-only member search, event registrations, assigned codes (including legacy reservations), membership access controls and per-reward eligibility. It requires verified email sign-in and an active administrator membership. Apply migrations through `202611200008_email_workspace_access.sql`; see [the registry guide](../docs/MEMBER-REGISTRY.md) for interfaces, permissions, migration and rollback details. Participants continue signing in at `/member` and see only their own records.
