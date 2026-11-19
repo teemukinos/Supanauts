@@ -2,7 +2,18 @@ import {cookies} from 'next/headers';
 import {body,config,json,memberClient,rateLimit,sameOrigin,sessionCookie} from '../../../../lib/community';
 async function guard(){const c=await memberClient();if(!c)return null;const {data,error}=await c.rpc('community_admin_status');return !error&&data?c:null;}
 async function provider(path:string,data?:object){const token=(await cookies()).get(sessionCookie)?.value;const c=config();const r=await fetch(c.url+'/auth/v1/'+path,{method:data?'POST':'GET',headers:{apikey:c.key,Authorization:'Bearer '+token,'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{}),cache:'no-store'});if(!r.ok)throw Error('Authenticator verification failed. Check your code and retry.');return r.json();}
-export async function GET(){try{if(!await guard())return json({error:'Administrator access required. Sign in with your organizer email.'},403);const user=await provider('user');return json({factors:(user.factors??[]).filter((f:{factor_type:string;status:string})=>f.factor_type==='totp'&&f.status==='verified').map((f:{id:string})=>({id:f.id}))});}catch{return json({error:'Could not load authenticator settings.'},503);}}
+export async function GET(){try{
+ const client=await memberClient();
+ if(!client)return json({error:'Sign in with your organizer email.',code:'SIGN_IN_REQUIRED'},401);
+ const {data:organizer,error:roleError}=await client.rpc('community_admin_status');
+ if(roleError)return json({error:'Could not check organizer access. Please retry.'},503);
+ if(!organizer)return json({error:'This account does not have organizer access.',code:'FORBIDDEN'},403);
+ const token=(await cookies()).get(sessionCookie)?.value;
+ const {data,error}=await client.auth.getClaims(token);
+ if(error||!data)return json({error:'Your session expired. Sign in again.',code:'SIGN_IN_REQUIRED'},401);
+ const user=await provider('user');
+ return json({email:user.email,verified:data.claims.aal==='aal2',factors:(user.factors??[]).filter((f:{factor_type:string;status:string})=>f.factor_type==='totp'&&f.status==='verified').map((f:{id:string})=>({id:f.id}))});
+}catch{return json({error:'Could not load authenticator settings. Please retry.'},503);}}
 export async function POST(req:Request){try{
  if(!sameOrigin(req))return json({error:'Invalid request origin.'},403);
  if(!await guard())return json({error:'Administrator access required.'},403);

@@ -36,3 +36,24 @@
 .registry .standard-form label { margin: 0; }
 .registry-detail details { margin-top: 1rem; }
 .registry-detail summary { cursor: pointer; padding-block: .75rem; }
+
+.registry .registry-filters { max-width: none; }
+.registry-filters .actions { margin: 0; gap: 8px; }
+.registry-management { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 24px; }
+.registry-detail .member-reward { border: 1px solid var(--line); padding: 18px; border-radius: 6px; }
+
+.registry .registry-filters fieldset { grid-template-columns: minmax(220px, 1fr) auto; }
+.registry-additional-filters { grid-column: 1 / -1; }
+.registry-additional-filters summary { padding: 12px 0; cursor: pointer; font-size: 14px; }
+.registry-filter-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 12px 0 20px; }
+@media (max-width: 650px) {
+  .registry .registry-filters fieldset, .registry-filter-options { grid-template-columns: 1fr; }
+  .registry-table, .registry-table tbody, .registry-table tr { display: block; }
+  .registry-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .registry-table tr { border: 1px solid var(--line); padding: 12px; border-radius: 8px; margin-block: 12px; }
+  .registry-table td { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; border: 0; padding: 8px 0; font-size: 14px; }
+  .registry-table td:first-child { min-width: 0; }
+  .registry-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--muted); }
+  .registry-table td.registry-row-action { display: block; }
+  .registry-row-action button { width: 100%; }
+}
