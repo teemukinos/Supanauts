@@ -16,7 +16,7 @@ Local verification scripts and evidence are intentionally excluded from Git unde
 
 ## Organizer workflow
 
-1. Sign in with the organizer account, then complete MFA at `/admin`.
+1. Sign in with the administrator email, then open `/admin`.
 2. Open `/admin/workspace`. Review membership separately from projects.
 3. In Content, load the six researched drafts. This creates five event drafts and an archive recap; it never publishes. Review source notes and exact facts, edit roles, then publish saved drafts individually.
 4. Approve project submissions only after checking links, media and both permission choices. New edits leave the current published revision intact. Withdrawal immediately removes public access, share-image access and media authorization unless the same asset remains used in another published project.
@@ -42,7 +42,7 @@ The current upload route accepts multipart uploads on a Node host with a 105 MB 
 
 ## Notification delivery
 
-Login delivery uses the server-side Resend API directly. Set `RESEND_API_KEY` and `LOGIN_EMAIL_FROM` to a sender on your verified Resend domain. The login endpoint checks membership and rate limits before asking Supabase Auth to generate an OTP; Resend transports that OTP. Supabase still verifies the code and issues the session. The signup allowlist hook, organizer MFA, and reward allocator remain unchanged. Never expose the generated OTP, link, or either provider credential in API responses or logs. No custom Supabase SMTP is required for this login path. Direct calls to Supabase's public OTP endpoint still use its separately configured sender.
+Login delivery uses the server-side Resend API directly. Set `RESEND_API_KEY` and `LOGIN_EMAIL_FROM` to a sender on your verified Resend domain. The login endpoint checks membership and rate limits before asking Supabase Auth to generate an OTP; Resend transports that OTP. Supabase still verifies the code and issues the session. The signup allowlist hook and reward allocator remain unchanged. Workspace access uses verified email and database roles; authenticator setup is not required after migration 008. Never expose the generated OTP, link, or either provider credential in API responses or logs. No custom Supabase SMTP is required for this login path. Direct calls to Supabase's public OTP endpoint still use its separately configured sender.
 
 Authentication delivery and moderation notification delivery are separate paths. `EMAIL_FROM`, `RESEND_API_KEY` and `NOTIFICATIONS_ENABLED=true` enable explicit queue dispatch. Login delivery does not enable decision emails. Keep preview credentials restricted to the owner-controlled application branch; add production credentials separately when authorizing production release. Changing Vercel environment variables requires a new deployment.
 

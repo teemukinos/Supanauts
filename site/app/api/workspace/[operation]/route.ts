@@ -17,7 +17,6 @@ function failure(message: string) {
   const known: Record<string, [number, string]> = {
     FORBIDDEN: [403, 'You do not have access to this workspace.'],
     INELIGIBLE: [403, 'Your membership is not active.'],
-    MFA_REQUIRED: [403, 'Verify your authenticator to continue.'],
     NOT_FOUND: [404, 'This record is unavailable.'],
     STALE_VERSION: [409, 'Someone changed this draft. Reload the saved version before retrying.'],
     FORBIDDEN_MEDIA: [403, 'This attachment is not available to this event.'],
