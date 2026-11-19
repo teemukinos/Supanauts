@@ -17,7 +17,7 @@ The default local URL is http://127.0.0.1:3017. If another preview already uses 
 ## Configure your own Supabase project
 
 1. Create or select a disposable development project that you control. Never use the production community project for development.
-2. Apply both migrations from `../supabase/migrations/` in filename order to that project using your chosen Supabase database migration tool or SQL Editor. They contain schema only; no members, codes, administrator assignments or production identifiers.
+2. Apply all migrations from `../supabase/migrations/` in filename order to that project using your chosen Supabase database migration tool or SQL Editor. They contain schema only; no members, codes, administrator assignments or production identifiers.
 3. Copy `.env.example` to `.env.local`. Set the project URL, publishable/anon key, server service-role key and exact `APP_ORIGIN`, including your local port. The service-role key must never be exposed through `NEXT_PUBLIC_`.
 4. Configure Email Auth with confirmation enabled. Enable the Before User Created Postgres hook for `public.community_before_user_created`. Give its URI your own project: `pg-functions://postgres/public/community_before_user_created`.
 5. Put `{{ .Token }}` in both the confirmation and magic-link email templates so the page can accept the numeric code. Use an eight-digit code with a ten-minute expiry. Configure your own SMTP or the local Supabase email inbox; the hosted default sender has recipient and delivery limits.
@@ -68,3 +68,7 @@ Also check mobile layout, keyboard navigation, reduced motion and pause controls
 ## Participation features
 
 Migration `202611140003_participation.sql` adds projects and immutable approved revisions, content drafts, private upload metadata, notification jobs, moderation, reporting, import previews, event calendars and aggregate metrics. See [`docs/PARTICIPATION-RELEASE.md`](../docs/PARTICIPATION-RELEASE.md) for setup, operation, verification limits, media-host requirements and release gates. All data and provider setup remains in your own Supabase project. Real email dispatch defaults to off.
+
+## Private organizer registry
+
+`/admin/members` provides organizer-only member search, event registrations, assigned codes (including legacy reservations), membership access controls and per-reward eligibility. It requires authenticator verification. Migration `202611190006_member_registry.sql` is required; see [the registry guide](../docs/MEMBER-REGISTRY.md) for interfaces, permissions, migration and rollback details. Participants continue signing in at `/member` and see only their own records.
