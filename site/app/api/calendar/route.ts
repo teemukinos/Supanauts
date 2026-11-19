@@ -1,5 +1,26 @@
-import {absolute,publicCommunity} from '../../../lib/participation';
-const escape=(s:string)=>s.replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
-const stamp=(s:string)=>new Date(s).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z/,'Z');
-function fold(line:string){const parts:string[]=[];let current='';for(const char of line){if(Buffer.byteLength(current+char)>73){parts.push(current);current=' '+char;}else current+=char;}parts.push(current);return parts.join('\r\n');}
-export async function GET(req:Request){const data=await publicCommunity();if(data.unavailable)return new Response('Calendar temporarily unavailable',{status:503});const slug=new URL(req.url).searchParams.get('event');const events=data.content.filter(x=>x.kind==='event'&&x.data.starts_at&&x.data.ends_at&&(!slug||x.slug===slug));const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Supanauts//Community events//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH'];for(const e of events)lines.push('BEGIN:VEVENT','UID:'+e.id+'@supanauts.com','DTSTAMP:'+stamp(e.published_at),'LAST-MODIFIED:'+stamp(e.published_at),'DTSTART:'+stamp(e.data.starts_at!),'DTEND:'+stamp(e.data.ends_at!),'SUMMARY:'+escape(e.data.title),'DESCRIPTION:'+escape(e.data.description),'LOCATION:'+escape(e.data.venue||e.data.city||''),'URL:'+absolute('/events/'+e.slug),'STATUS:'+(e.data.cancelled?'CANCELLED':'CONFIRMED'),'END:VEVENT');lines.push('END:VCALENDAR');return new Response(lines.map(fold).join('\r\n')+'\r\n',{headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'attachment; filename="supanauts.ics"','Cache-Control':'no-store'}});}
+import {absolute, publicCommunity, siteOrigin} from '../../../lib/participation';
+import {mergeEvents} from '../../../lib/calendar';
+import {calendarIcs} from '../../../lib/calendar-ics';
+import {lumaCalendar} from '../../../lib/luma-sync';
+
+export const dynamic = 'force-dynamic';
+export async function GET(request: Request) {
+  const [community, calendar] = await Promise.all([publicCommunity(), lumaCalendar()]);
+  const requested = new URL(request.url).searchParams.get('event');
+  const events = mergeEvents(calendar.events, community.content).filter(event => !requested || event.id === requested || event.localPath === `/events/${requested}`);
+  if (requested && events.some(event => event.scheduleNote)) return new Response('Confirm this event date with the organizer before adding it to a calendar.', {status: 409});
+  if (requested && !events.length) return new Response('Event not found', {status: community.unavailable && !community.preview ? 503 : 404});
+  // An empty source cache during an outage can omit events seen by subscribers.
+  // Let clients keep their last feed instead of treating the fallback as deletion.
+  if (!requested && calendar.incomplete) return new Response('Calendar source refresh temporarily unavailable', {status: 503, headers: {'Retry-After': '300', 'X-Calendar-Sync': 'delayed'}});
+  // A partial subscription can remove missing events from calendar clients. Fail closed
+  // when published Supanauts content is temporarily unavailable in a configured backend.
+  if (!requested && community.unavailable && !community.preview) return new Response('Calendar temporarily unavailable', {status: 503, headers: {'Retry-After': '300'}});
+  return new Response(calendarIcs(events.map(event => ({...event, url: event.url.startsWith('/') ? absolute(event.url) : event.url})), siteOrigin()), {headers: {
+    'Content-Type': 'text/calendar; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="supanauts.ics"',
+    'Cache-Control': 'no-store',
+    'X-Calendar-Source-Checked': calendar.updatedAt,
+    'X-Calendar-Sync': !calendar.enabled ? 'paused' : calendar.delayed ? 'delayed' : 'active',
+  }});
+}
