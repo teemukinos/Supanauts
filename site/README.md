@@ -68,3 +68,7 @@ Also check mobile layout, keyboard navigation, reduced motion and pause controls
 ## Participation features
 
 Migration `202611140003_participation.sql` adds projects and immutable approved revisions, content drafts, private upload metadata, notification jobs, moderation, reporting, import previews, event calendars and aggregate metrics. See [`docs/PARTICIPATION-RELEASE.md`](../docs/PARTICIPATION-RELEASE.md) for setup, operation, verification limits, media-host requirements and release gates. All data and provider setup remains in your own Supabase project. Real email dispatch defaults to off.
+
+## Community calendar synchronization
+
+`/events` and `/api/calendar` automatically revalidate configured public Luma sources hourly on use. Open pages check for fresh server data every five minutes. The Next.js Data Cache retains verified source data across requests; the bundled snapshot is the cold-cache fallback. No Luma credentials are needed. Set `LUMA_SYNC_ENABLED=false` for offline development. See [calendar operations](../docs/calendar/README.md) for coverage, caching, throttling and hosting requirements.

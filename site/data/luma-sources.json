@@ -1,0 +1,57 @@
+{
+  "calendars": [
+    {
+      "id": "cal-8x55tE86VtAD07z",
+      "url": "https://luma.com/supabase_community_events",
+      "name": "Supabase Community Events"
+    }
+  ],
+  "events": [
+    "supabase-eh6n",
+    "stacksync-supabase-nyc",
+    "lsp2rnhf",
+    "f26",
+    "builders-delhi",
+    "0so5ljr8",
+    "quito-2026-11-meetup",
+    "pgvnvwgn",
+    "supabase-lvcl",
+    "supabase-sziy",
+    "vx78o719",
+    "y6bexb2h",
+    "8l00l79p",
+    "supasantiago",
+    "2okdqw96",
+    "5uv64ic8",
+    "f9wrn00j",
+    "ecfdmntu",
+    "ehzvtzfx",
+    "3bmr2ri8",
+    "lfrkqeew",
+    "73nvkfor",
+    "qddvsz9u",
+    "supavandevdojo",
+    "guorut8f",
+    "q1ucw5hv",
+    "gdwg87od",
+    "flsurefv",
+    "sw5s5p1a",
+    "03af412r",
+    "build-pitch",
+    "ktms5ody",
+    "zkxj8z7b",
+    "bj0bd073"
+  ],
+  "aliases": {
+    "https://luma.com/pm408yiv": "https://luma.com/2okdqw96"
+  },
+  "notes": "Public search and the Supabase calendar are discovery sources, not an exhaustive index. Partner listings include Supabase-focused sessions and explicitly Supabase-supported events. Aliases record organizer-announced event merges.",
+  "scheduleNotes": {
+    "https://luma.com/f26": "The Luma schedule and description show different dates. Confirm the date with the organizer before making plans."
+  },
+  "onlineEvents": [
+    "https://luma.com/gdwg87od",
+    "https://luma.com/flsurefv",
+    "https://luma.com/sw5s5p1a"
+  ]
+}
