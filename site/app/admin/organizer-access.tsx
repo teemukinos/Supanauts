@@ -167,10 +167,6 @@ export default function WorkspaceAccess({ children }: { children: ReactNode }) {
                   </p>
                   {!factor ? (
                     <>
-                      <p>
-                        Use an authenticator app such as 1Password, Google Authenticator or Microsoft
-                        Authenticator.
-                      </p>
                       <button className="primary" disabled={busy} onClick={enroll}>
                         {busy ? 'Preparing…' : 'Set up authenticator'}
                       </button>
