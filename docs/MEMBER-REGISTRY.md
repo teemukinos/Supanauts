@@ -2,6 +2,16 @@
 
 The organizer registry is available at `/admin/members`, linked from `/admin`, the organizer workspace, and an organizer's member account. It extends the existing Supabase Auth email-code flow and Resend transport. It does not introduce public signup or a public member directory.
 
+## Finding participants and codes
+
+Open `/admin/members`. If the current browser is signed out, choose **Sign in as organizer** and enter the emailed code. The sign-in flow returns to the requested organizer page. The page then handles authenticator setup or verification inline before showing private controls.
+
+Choose **Participants with codes**, then **View codes & details** beside a participant. Assigned codes appear first in the record. **Back to participants** returns to the filtered list. **Reservations without membership** shows recipients whose codes are reserved but whose email has no matching member account. Access and eligibility changes sit behind **Manage access & reward eligibility** in the participant record.
+
+Organizer navigation separates **Members & codes**, **Join requests**, and **Community management**. Participants use `/member`, where **My codes & rewards** appears before projects, with copy and redemption actions beside each assigned code. Account navigation links to profile preferences and community channels.
+
+The access screen distinguishes a signed-out browser, a member without organizer privileges, an organizer awaiting MFA, and an unavailable service. Authentication does not transfer between browsers. No session duration, cookie protection, database permission or MFA requirement is relaxed by this interface.
+
 ## Access and records
 
 Every registry RPC requires an active organizer membership and an AAL2 authenticator session. Participants can only retrieve their own registrations and rewards through the existing member endpoints. Private API responses use `Cache-Control: no-store, private`; registry records are never included in the public community endpoint or the SupaSquad directory.
