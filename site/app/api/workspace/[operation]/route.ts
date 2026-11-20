@@ -32,7 +32,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ operatio
     if (!c) return json({ error: 'Sign in to continue.' }, 401);
     const { operation } = await params;
     const q = new URL(req.url).searchParams;
-    const page = Math.max(1, Math.min(100000, Number(q.get('page')) || 1));
+    const requestedPage = Number(q.get('page'));
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(100000, requestedPage) : 1;
     const search = text(q.get('search') || '', 254);
     let result;
     if (operation === 'events')
@@ -41,7 +42,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ operatio
         p_page: page,
         p_search: search,
       });
-    else if (operation === 'admin') {
+    else if (operation === 'content') {
+      result = await c.rpc('community_admin_content', { p_id: uuid(q.get('id')) });
+      if (!result.error && result.data.kind !== q.get('kind'))
+        return json({ error: 'This draft is unavailable.' }, 404);
+    } else if (operation === 'admin') {
       const section = q.get('section') || 'overview';
       if (!sections.includes(section)) return json({ error: 'Not found.' }, 404);
       result = await c.rpc('community_admin_screen', { p_section: section, p_page: page, p_search: search });

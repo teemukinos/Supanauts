@@ -1,11 +1,16 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { ContentData } from '../../lib/participation';
-import { PageHeader, Status, Loading, ErrorMessage, Button, Pagination, request } from './ui';
+import { PageHeader, Status, Loading, ErrorMessage, Button, Pagination, request, pageNumber } from './ui';
 import ContentEditor from './content-editor';
-type Event = { id: string; title: string; data: ContentData | null; draft_status: string };
+type Event = {
+  id: string;
+  title: string;
+  data: ContentData | null;
+  draft_status: string;
+};
 type Detail = {
   id: string;
   title: string;
@@ -15,34 +20,62 @@ type Detail = {
   review_status: string;
   evidence: string;
   total: number;
-  participants: { email: string; name: string; status: string; source_record: string }[];
+  participants: {
+    email: string;
+    name: string;
+    status: string;
+    source_record: string;
+  }[];
 };
 export default function Organizer({ id }: { id?: string }) {
   const params = useSearchParams(),
     router = useRouter();
-  const tab = params.get('tab') || 'participants',
-    page = Math.max(1, Number(params.get('page')) || 1),
+  const tab = ['overview', 'participants', 'draft'].includes(params.get('tab') || '')
+      ? params.get('tab')!
+      : 'participants',
+    page = pageNumber(params.get('page')),
     query = params.get('search') || '';
   const [events, setEvents] = useState<Event[] | null>(null),
     [detail, setDetail] = useState<Detail | null>(null),
     [search, setSearch] = useState(query),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
+  const loadNumber = useRef(0);
   async function load() {
+    const currentLoad = ++loadNumber.current;
     setError('');
     try {
       const url =
         '/api/workspace/events' +
         (id ? '?id=' + id + '&page=' + page + '&search=' + encodeURIComponent(query) : '');
-      if (id) setDetail(await request(url));
-      else setEvents((await request<{ events: Event[] }>(url)).events);
+      if (id) {
+        const result = await request<Detail>(url);
+        if (currentLoad === loadNumber.current) setDetail(result);
+      } else {
+        const result = await request<{ events: Event[] }>(url);
+        if (currentLoad === loadNumber.current) setEvents(result.events);
+      }
     } catch (e) {
-      setError((e as Error).message);
+      if (currentLoad === loadNumber.current) setError((e as Error).message);
     }
   }
   useEffect(() => {
+    setDetail(null);
+    setEvents(null);
+    setSearch(query);
     void load();
+    return () => {
+      loadNumber.current++;
+    };
   }, [id, page, query]);
+  useEffect(() => {
+    if (tab === 'draft' && detail) return;
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
+  }, [id, page, query, tab, !!detail]);
   function navigate(patch: Record<string, string>) {
     const q = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(patch)) v ? q.set(k, v) : q.delete(k);
@@ -106,6 +139,7 @@ export default function Organizer({ id }: { id?: string }) {
               detail.draft ? (
                 <ContentEditor
                   key={detail.id + detail.version}
+                  onReload={load}
                   initial={detail.draft}
                   evidence={detail.evidence}
                   eventId={id}

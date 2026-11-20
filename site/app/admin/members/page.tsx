@@ -10,7 +10,7 @@ import type {
 } from '../../../lib/member-registry';
 import './registry.css';
 import { useSearchParams } from 'next/navigation';
-import { CopyCode } from '../../../components/app/ui';
+import { CopyCode, pageNumber } from '../../../components/app/ui';
 
 const defaults: RegistryFilters = {
   search: '',
@@ -60,7 +60,7 @@ export default function Registry() {
         ? (params.get('assignment') as RegistryFilters['assignment'])
         : 'all',
       view: params.get('view') === 'reservations' ? 'reservations' : 'members',
-      page: Math.max(1, Number(params.get('page')) || 1),
+      page: pageNumber(params.get('page')),
     }),
     [params],
   );
@@ -87,6 +87,11 @@ export default function Registry() {
   const [address, setAddress] = useState(''),
     [name, setName] = useState(''),
     [reason, setReason] = useState('');
+  useEffect(() => {
+    const restore = () => setRevision((value) => value + 1);
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
+  }, []);
   const detailHeading = useRef<HTMLHeadingElement>(null),
     createHeading = useRef<HTMLHeadingElement>(null);
 
@@ -146,9 +151,9 @@ export default function Registry() {
       });
     } catch (e) {
       setError(message(e));
-      setMember(null);
       if (e instanceof RegistryError && [401, 403].includes(e.status)) {
         setResult(null);
+        setMember(null);
         setSelected('');
       }
       return null;
@@ -602,7 +607,7 @@ export default function Registry() {
             <summary>Manage access & reward eligibility</summary>
             <h3>Account access</h3>
             {member.is_admin ? (
-              <p>Organizer accounts cannot be suspended here.</p>
+              <p>Administrator accounts cannot be suspended here.</p>
             ) : (
               <AccessForm key={member.id + member.active} active={member.active} busy={busy} save={access} />
             )}

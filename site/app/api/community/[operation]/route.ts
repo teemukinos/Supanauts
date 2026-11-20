@@ -38,11 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ operatio
             : null;
     if (!name) return json({ error: 'Not found.' }, 404);
     const { data, error } = await c.rpc(name);
-    if (error)
-      return json(
-        { error: 'Access unavailable. Check your workspace permissions.' },
-        403,
-      );
+    if (error) return json({ error: 'Access unavailable. Check your workspace permissions.' }, 403);
     return json(
       operation === 'workspace'
         ? {
@@ -229,17 +225,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ operati
       }
     } else return json({ error: 'Not found.' }, 404);
     const { data, error } = await c.rpc(rpc, args);
-    if (error)
+    if (error) {
+      const messages: Record<string, string> = {
+        STALE_VERSION: 'Someone changed this draft. Reload before saving.',
+        ALREADY_REVIEWED: 'This revision was already reviewed. Refresh the queue.',
+        TOO_MANY_FILES: 'Use at most five images and one video in a project.',
+        INVALID_MEDIA: 'An attachment is unavailable. Remove it and upload the file again.',
+        DISPLAY_PERMISSION_REQUIRED: 'Allow website display before submitting your project.',
+        EVIDENCE_REQUIRED: 'Add source and media-rights notes before publishing this page.',
+        FORBIDDEN: 'Your account does not have permission for this action.',
+        INELIGIBLE: 'Your membership is not active. Contact an admin for help.',
+      };
+      const match = Object.entries(messages).find(([key]) => error.message.includes(key));
       return json(
         {
-          error: error.message.includes('STALE_VERSION')
-            ? 'Someone changed this draft. Reload before saving.'
-            : error.message.includes('ALREADY_REVIEWED')
-              ? 'This revision was already reviewed. Refresh the queue.'
-              : 'Could not save. Check access, required fields and refresh before retrying.',
+          error: match?.[1] || 'Could not save. Check the fields and try again. Your changes are still here.',
         },
-        400,
+        error.message.includes('STALE_VERSION') ? 409 : 400,
       );
+    }
     return json({ ok: true, result: data });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Request failed.' }, 400);

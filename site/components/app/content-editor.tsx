@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import type { ContentData } from '../../lib/participation';
+import { localEventTime, eventTimeUTC } from '../../lib/event-time';
+import { useUploadPolicy, uploadHelp, uploadMedia } from './upload';
 import { Media } from '../../app/media';
 import { Button, ErrorMessage, Modal, useUnsaved } from './ui';
 export const emptyContent: ContentData = {
@@ -25,6 +27,7 @@ export default function ContentEditor({
   slug = '',
   eventId,
   onSave,
+  onReload,
   organizer = false,
 }: {
   initial?: ContentData;
@@ -33,11 +36,17 @@ export default function ContentEditor({
   slug?: string;
   eventId?: string;
   organizer?: boolean;
+  onReload?: () => Promise<void>;
   onSave: (data: ContentData, evidence: string, slug: string, submit: boolean) => Promise<void>;
 }) {
   const [data, setData] = useState({ ...emptyContent, ...initial }),
     [notes, setNotes] = useState(evidence),
     [urlSlug, setSlug] = useState(slug),
+    [slugEdited, setSlugEdited] = useState(!!slug),
+    [times, setTimes] = useState({
+      starts_at: localEventTime(initial.starts_at, initial.timezone || 'Europe/Helsinki'),
+      ends_at: localEventTime(initial.ends_at, initial.timezone || 'Europe/Helsinki'),
+    }),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -45,8 +54,19 @@ export default function ContentEditor({
     [preview, setPreview] = useState(false),
     [progress, setProgress] = useState<number | null>(null);
   useUnsaved(dirty);
+  const uploadPolicy = useUploadPolicy();
   function update(key: string, value: unknown) {
     setData((p) => ({ ...p, [key]: value }));
+    if (key === 'title' && !slugEdited && !organizer)
+      setSlug(
+        String(value)
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 100),
+      );
     setDirty(true);
     setNotice('');
   }
@@ -54,7 +74,22 @@ export default function ContentEditor({
     setError('');
     setBusy(true);
     try {
-      await onSave(data, notes, urlSlug, submit);
+      let savedData = data;
+      if (kind === 'event') {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: data.timezone });
+        } catch {
+          throw Error('Choose a valid event timezone, such as Europe/Helsinki.');
+        }
+        savedData = {
+          ...data,
+          starts_at: eventTimeUTC(times.starts_at, data.timezone || 'Europe/Helsinki'),
+          ends_at: eventTimeUTC(times.ends_at, data.timezone || 'Europe/Helsinki'),
+        };
+        if (savedData.starts_at && savedData.ends_at && savedData.ends_at <= savedData.starts_at)
+          throw Error('The end time must be after the start time.');
+      }
+      await onSave(savedData, notes, urlSlug, submit);
       setDirty(false);
       setNotice(submit ? 'Submitted for admin review.' : 'Private draft saved.');
     } catch (e) {
@@ -70,7 +105,16 @@ export default function ContentEditor({
         <input
           type={type}
           required={required}
-          maxLength={key === 'title' ? 120 : 1000}
+          minLength={key === 'title' ? 3 : undefined}
+          maxLength={
+            key === 'title'
+              ? 120
+              : key === 'city' || key === 'date_label'
+                ? 100
+                : key === 'venue'
+                  ? 200
+                  : 1000
+          }
           value={String(data[key] ?? '')}
           onChange={(e) => update(key, e.target.value)}
         />
@@ -81,25 +125,7 @@ export default function ContentEditor({
     setError('');
     setProgress(0);
     try {
-      const form = new FormData();
-      form.set('file', file);
-      const result = await new Promise<{ id: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/uploads' + (eventId ? '?event=' + eventId : ''));
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onerror = () => reject(Error('Upload interrupted. Retry this file.'));
-        xhr.onload = () => {
-          try {
-            const value = JSON.parse(xhr.responseText);
-            xhr.status < 300 ? resolve(value) : reject(Error(value.error || 'Upload failed.'));
-          } catch {
-            reject(Error('Upload failed.'));
-          }
-        };
-        xhr.send(form);
-      });
+      const result = await uploadMedia(file, uploadPolicy, setProgress, eventId);
       update('media', [...(data.media || []), result.id]);
     } catch (e) {
       setError((e as Error).message);
@@ -116,6 +142,18 @@ export default function ContentEditor({
       }}
     >
       <ErrorMessage error={error} />
+      {onReload && error.includes('Someone changed') && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (!dirty || confirm('Discard your unsaved changes and reload the latest saved draft?'))
+              void onReload();
+          }}
+        >
+          Reload saved draft
+        </Button>
+      )}
       {notice && (
         <p role="status" className="member-notice">
           {notice}
@@ -129,11 +167,13 @@ export default function ContentEditor({
             Page address
             <input
               pattern="[a-z0-9][a-z0-9-]*"
+              maxLength={100}
               required
               value={urlSlug}
               readOnly={!!slug}
               onChange={(e) => {
                 setSlug(e.target.value);
+                setSlugEdited(true);
                 setDirty(true);
               }}
             />
@@ -171,18 +211,20 @@ export default function ContentEditor({
           {input('venue', 'Venue')}
           {(['starts_at', 'ends_at'] as const).map((key) => (
             <label key={key}>
-              {key === 'starts_at' ? 'Starts' : 'Ends'} (UTC)
+              {key === 'starts_at' ? 'Starts' : 'Ends'}
               <input
                 type="datetime-local"
-                value={data[key] ? new Date(data[key]!).toISOString().slice(0, 16) : ''}
-                onChange={(e) =>
-                  update(key, e.target.value ? new Date(e.target.value + 'Z').toISOString() : '')
-                }
+                value={times[key]}
+                onChange={(e) => {
+                  setTimes((t) => ({ ...t, [key]: e.target.value }));
+                  setDirty(true);
+                  setNotice('');
+                }}
               />
             </label>
           ))}
           <label>
-            Display timezone
+            Event timezone
             <input
               list="timezones"
               value={data.timezone}
@@ -194,6 +236,7 @@ export default function ContentEditor({
               ))}
             </datalist>
           </label>
+          <p className="fineprint">Start and end times use the event timezone above.</p>
           {input('date_label', 'Historical date, if exact time is unknown')}
           {input('registration_url', 'Registration link', 'url')}
           <label className="check">
@@ -209,10 +252,10 @@ export default function ContentEditor({
       <fieldset disabled={busy || progress !== null}>
         <legend>Media and permissions</legend>
         <label>
-          Attach an image or video
+          Attach event or article media
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4"
+            accept={'image/jpeg,image/png,image/webp' + (uploadPolicy.videoMaxBytes ? ',video/mp4' : '')}
             disabled={(data.media?.length || 0) >= 12}
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -221,6 +264,7 @@ export default function ContentEditor({
             }}
           />
         </label>
+        <p className="fineprint">{uploadHelp(uploadPolicy)} Up to 12 attachments.</p>
         {progress !== null && (
           <p role="status">{progress === 100 ? 'Processing media…' : `Uploading ${progress}%`}</p>
         )}
@@ -244,9 +288,8 @@ export default function ContentEditor({
           ))}
         </div>
         <label>
-          Private source and media-rights notes
+          Private source and media-rights notes (required before publication)
           <textarea
-            required
             maxLength={5000}
             rows={3}
             value={notes}
@@ -317,7 +360,12 @@ export default function ContentEditor({
       ))}
       <div className="actions">
         <Button disabled={busy || progress !== null}>{busy ? 'Saving…' : 'Save draft'}</Button>
-        <Button type="button" variant="outline" onClick={() => setPreview(true)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || progress !== null}
+          onClick={() => setPreview(true)}
+        >
           Preview
         </Button>
         {organizer && (

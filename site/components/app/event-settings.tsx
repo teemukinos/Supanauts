@@ -1,13 +1,20 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import type { RegistryResult } from '../../lib/member-registry';
-import { Button, ErrorMessage, request } from './ui';
+import { Button, ErrorMessage, request, useUnsaved } from './ui';
 export type EventSettingsData = {
   events: { id: string; title: string }[];
   organizers: { event_id: string; member_id: string; email: string }[];
   sources: { label: string; event_id: string }[];
   unmapped: { label: string; registrations: number }[];
-  settings: { whatsapp?: { community?: string; announcements?: string; builders?: string } };
+  settings: {
+    whatsapp?: {
+      community?: string;
+      announcements?: string;
+      builders?: string;
+    };
+  };
 };
 export default function EventSettings({
   data,
@@ -17,6 +24,9 @@ export default function EventSettings({
   reload: () => Promise<void>;
 }) {
   const [event, setEvent] = useState(''),
+    [mappingEvent, setMappingEvent] = useState(''),
+    [searched, setSearched] = useState(false),
+    [dirty, setDirty] = useState(false),
     [search, setSearch] = useState(''),
     [members, setMembers] = useState<{ id: string; email: string }[]>([]),
     [member, setMember] = useState(''),
@@ -30,11 +40,17 @@ export default function EventSettings({
       builders: '',
       ...data.settings.whatsapp,
     });
+  useUnsaved(dirty);
   async function action(action: string, p: object) {
     setBusy(true);
     setError('');
+    setNotice('');
     try {
-      await request('/api/workspace/event-admin', { action, event_id: event, ...p });
+      await request('/api/workspace/event-admin', {
+        action,
+        event_id: action === 'map' ? mappingEvent : event,
+        ...p,
+      });
       setNotice(
         action === 'assign'
           ? 'Event organizer access granted.'
@@ -57,6 +73,18 @@ export default function EventSettings({
           {notice}
         </p>
       )}
+      {!data.events.length && (
+        <section className="panel panel-body">
+          <h2>Create your first managed event</h2>
+          <p>
+            Create an event draft before assigning organizers, importing registrations or linking earlier
+            registrations. External calendar listings are not added here automatically.
+          </p>
+          <Link className="btn primary" href="/admin/events?id=new">
+            Create event draft
+          </Link>
+        </section>
+      )}
       <section className="panel panel-body">
         <h2>Event organizers</h2>
         <p>
@@ -65,7 +93,17 @@ export default function EventSettings({
         </p>
         <label>
           Event
-          <select value={event} onChange={(e) => setEvent(e.target.value)}>
+          <select
+            disabled={!data.events.length || busy}
+            value={event}
+            onChange={(e) => {
+              setEvent(e.target.value);
+              setMember('');
+              setMembers([]);
+              setSearched(false);
+              setNotice('');
+            }}
+          >
             <option value="">Choose event</option>
             {data.events.map((x) => (
               <option value={x.id} key={x.id}>
@@ -82,11 +120,15 @@ export default function EventSettings({
                 e.preventDefault();
                 setBusy(true);
                 setError('');
+                setMember('');
+                setMembers([]);
+                setSearched(false);
                 try {
                   const result = await request<RegistryResult>(
                     '/api/admin/members?status=active&search=' + encodeURIComponent(search),
                   );
                   if (result.view === 'members') setMembers(result.items);
+                  setSearched(true);
                 } catch (e) {
                   setError((e as Error).message);
                 } finally {
@@ -102,6 +144,11 @@ export default function EventSettings({
                 Search members
               </Button>
             </form>
+            {searched && !members.length && (
+              <p role="status">
+                No active members match this search. Try another email or add the member in Members.
+              </p>
+            )}
             {members.length > 0 && (
               <div className="actions">
                 <select
@@ -148,10 +195,10 @@ export default function EventSettings({
         )}
       </section>
       <section className="panel panel-body">
-        <h2>Unmapped registration sources</h2>
+        <h2>Connect earlier registrations</h2>
         <p>
-          Unmapped registrations stay admin-only. Mapping a source makes its registrations visible to
-          organizers assigned to that event.
+          Connect each imported registration label to its event. Until connected, those registrations remain
+          visible only to admins. Assigned organizers can then see their event’s participants.
         </p>
         {!data.unmapped.length ? (
           <p>All registration sources are mapped.</p>
@@ -176,8 +223,13 @@ export default function EventSettings({
               </select>
             </label>
             <label>
-              Canonical event
-              <select required value={event} onChange={(e) => setEvent(e.target.value)}>
+              Event for these registrations
+              <select
+                required
+                disabled={!data.events.length || busy}
+                value={mappingEvent}
+                onChange={(e) => setMappingEvent(e.target.value)}
+              >
                 <option value="">Choose event</option>
                 {data.events.map((x) => (
                   <option key={x.id} value={x.id}>
@@ -186,7 +238,7 @@ export default function EventSettings({
                 ))}
               </select>
             </label>
-            <Button disabled={busy}>Map reviewed source</Button>
+            <Button disabled={busy || !mappingEvent || !label}>Connect registrations</Button>
           </form>
         )}
         <details>
@@ -205,9 +257,15 @@ export default function EventSettings({
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
+            setError('');
+            setNotice('');
             try {
-              await request('/api/community/admin', { action: 'settings', data: links });
+              await request('/api/community/admin', {
+                action: 'settings',
+                data: links,
+              });
               setNotice('Invitation links saved.');
+              setDirty(false);
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -217,15 +275,28 @@ export default function EventSettings({
         >
           {(['community', 'announcements', 'builders'] as const).map((key) => (
             <label key={key}>
-              {key}
+              {key === 'community'
+                ? 'Community invitation'
+                : key === 'announcements'
+                  ? 'Announcements invitation'
+                  : 'Builders invitation'}
               <input
                 type="url"
+                maxLength={1000}
+                placeholder="https://chat.whatsapp.com/…"
                 value={links[key]}
-                onChange={(e) => setLinks({ ...links, [key]: e.target.value })}
+                onChange={(e) => {
+                  setLinks({ ...links, [key]: e.target.value });
+                  setDirty(true);
+                  setNotice('');
+                }}
               />
             </label>
           ))}
-          <Button disabled={busy}>Save invitations</Button>
+          <p className="fineprint">
+            Use official WhatsApp invitation links. Leave a field empty to hide that invitation.
+          </p>
+          <Button disabled={busy || !dirty}>{busy ? 'Saving…' : 'Save invitations'}</Button>
         </form>
       </section>
     </>

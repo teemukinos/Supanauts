@@ -1,6 +1,6 @@
 'use client';
 import MemberNav from '../member-nav';
-import { SiteHeader, SiteFooter } from '../../community-ui';
+import { request } from '../../../components/app/ui';
 import '../../account.css';
 import { useEffect, useState } from 'react';
 type Channels = { community?: string; announcements?: string; builders?: string };
@@ -15,13 +15,7 @@ export default function MemberCommunity() {
     setLinks(null);
     setAgreed(false);
     try {
-      const r = await fetch('/api/community/channels', { cache: 'no-store' });
-      if (r.status === 401) {
-        window.location.replace('/member?next=%2Fmember%2Fcommunity');
-        return;
-      }
-      const d = await r.json();
-      if (!r.ok) throw Error(d.error || 'Community channels are unavailable.');
+      const d = await request<{ whatsapp: Channels }>('/api/community/channels');
       setLinks(d.whatsapp);
     } catch (e) {
       setError((e as Error).message);
@@ -31,6 +25,11 @@ export default function MemberCommunity() {
   }
   useEffect(() => {
     void load();
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
   }, []);
   return (
     <div className="account-shell">

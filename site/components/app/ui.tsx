@@ -35,6 +35,7 @@ export function CopyCode({ code }: { code: string }) {
       <div className="code-box">
         <code>{code}</code>
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={async () => {
@@ -86,7 +87,7 @@ export function Modal({
       <header className="between">
         <h2>{title}</h2>
         {dismissible && (
-          <Button variant="ghost" size="icon" aria-label="Close dialog" onClick={onClose}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Close dialog" onClick={onClose}>
             <X size={18} />
           </Button>
         )}
@@ -100,7 +101,7 @@ export function ErrorMessage({ error, retry }: { error: string; retry?: () => vo
     <div role="alert" className="member-error">
       <p>{error}</p>
       {retry && (
-        <Button variant="outline" onClick={retry}>
+        <Button type="button" variant="outline" onClick={retry}>
           Try again
         </Button>
       )}
@@ -130,7 +131,7 @@ export function Pagination({
   return (
     <div className="table-footer">
       <span>
-        {total} records · Page {page} of {Math.max(1, Math.ceil(total / size))}
+        {total} {total === 1 ? 'record' : 'records'} · Page {page} of {Math.max(1, Math.ceil(total / size))}
       </span>
       <div className="flex">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
@@ -143,19 +144,35 @@ export function Pagination({
     </div>
   );
 }
-export async function request<T>(url: string, data?: unknown): Promise<T> {
-  const response = await fetch(url, {
-    cache: 'no-store',
-    ...(data === undefined
-      ? {}
-      : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
-  });
-  const result = await response.json();
+export async function request<T>(url: string, data?: unknown, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      cache: 'no-store',
+      signal,
+      ...(data === undefined
+        ? {}
+        : {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          }),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw Error('Connection interrupted. Check your connection and try again. Your changes are still here.');
+  }
+  const result = await response.json().catch(() => null);
+  if (response.status === 401) window.dispatchEvent(new Event('sessionchange'));
+  if (!result) throw Error('The service did not respond correctly. Please try again.');
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event('sessionchange'));
     throw Error(result.error || 'Request failed. Please retry.');
   }
   return result;
+}
+export function pageNumber(value: string | null) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? Math.min(page, 100000) : 1;
 }
 export function useUnsaved(dirty: boolean) {
   useEffect(() => {
