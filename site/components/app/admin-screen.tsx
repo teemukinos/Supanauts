@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { ContentData } from '../../lib/participation';
@@ -14,6 +14,8 @@ import {
   Pagination,
   Modal,
   request,
+  pageNumber,
+  useUnsaved,
 } from './ui';
 import ContentEditor from './content-editor';
 import ImportWizard from './import-wizard';
@@ -81,9 +83,10 @@ export default function AdminScreen({ section }: { section: string }) {
   const router = useRouter(),
     path = usePathname(),
     params = useSearchParams();
-  const page = Math.max(1, Number(params.get('page')) || 1),
+  const page = pageNumber(params.get('page')),
     search = params.get('search') || '',
     editorId = params.get('id');
+  const [content, setContent] = useState<Item | null>(null);
   const [data, setData] = useState<Screen | null>(null),
     [overview, setOverview] = useState<Record<string, number> | null>(null),
     [metrics, setMetrics] = useState<{
@@ -102,46 +105,79 @@ export default function AdminScreen({ section }: { section: string }) {
     [share, setShare] = useState(''),
     [copy, setCopy] = useState(''),
     [approved, setApproved] = useState('');
-  const edit = data?.items?.find((x) => x.id === editorId);
+  const edit = content?.id === editorId ? content : data?.items?.find((x) => x.id === editorId);
   const creating = editorId === 'new';
   function navigate(patch: Record<string, string>) {
     const q = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(patch)) value ? q.set(key, value) : q.delete(key);
     router.push(path + (q.size ? '?' + q : ''));
   }
+  const loadNumber = useRef(0);
   async function load() {
+    const currentLoad = ++loadNumber.current;
     setError('');
     try {
-      if (section === 'activity') setMetrics(await request('/api/community/metrics'));
-      else if (section === 'overview') setOverview(await request('/api/workspace/admin?section=overview'));
-      else
-        setData(
-          await request(
-            '/api/workspace/admin?section=' +
-              section +
-              '&page=' +
-              page +
-              '&search=' +
-              encodeURIComponent(search),
-          ),
+      if (editorId && editorId !== 'new' && ['events', 'updates'].includes(section)) {
+        const selected = await request<Item>(
+          '/api/workspace/content?id=' +
+            encodeURIComponent(editorId) +
+            '&kind=' +
+            (section === 'events' ? 'event' : 'story'),
         );
+        if (currentLoad === loadNumber.current) setContent(selected);
+      }
+      if (section === 'activity') {
+        const result = await request<NonNullable<typeof metrics>>('/api/community/metrics');
+        if (currentLoad === loadNumber.current) setMetrics(result);
+      } else if (section === 'overview') {
+        const result = await request<Record<string, number>>('/api/workspace/admin?section=overview');
+        if (currentLoad === loadNumber.current) setOverview(result);
+      } else {
+        const result = await request<Screen>(
+          '/api/workspace/admin?section=' +
+            section +
+            '&page=' +
+            page +
+            '&search=' +
+            encodeURIComponent(search),
+        );
+        if (currentLoad === loadNumber.current) setData(result);
+      }
     } catch (e) {
-      setError((e as Error).message);
+      if (currentLoad === loadNumber.current) setError((e as Error).message);
     }
   }
   useEffect(() => {
     setData(null);
+    setContent(null);
     setMetrics(null);
     setOverview(null);
-    setNotice('');
     setQuery(search);
     void load();
-  }, [section, page, search]);
+    return () => {
+      loadNumber.current++;
+    };
+  }, [section, page, search, editorId]);
+  useEffect(() => {
+    setNotice('');
+    setConfirmation(null);
+  }, [section]);
+  useEffect(() => {
+    if (editorId) return;
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
+  }, [section, page, search, editorId]);
   async function action(name: string, payload: object, message: string) {
     setBusy(name);
     setError('');
     try {
-      const result = await request('/api/community/admin', { action: name, data: payload });
+      const result = await request('/api/community/admin', {
+        action: name,
+        data: payload,
+      });
       setNotice(message);
       await load();
       return result;
@@ -157,20 +193,33 @@ export default function AdminScreen({ section }: { section: string }) {
   return (
     <main id="main">
       <PageHeader
-        title={titles[section] || 'Workspace'}
+        title={
+          creating
+            ? 'New ' + (section === 'events' ? 'event' : 'update')
+            : editorId
+              ? 'Edit ' + (section === 'events' ? 'event' : 'update')
+              : titles[section] || 'Workspace'
+        }
         description={
           section === 'codes'
             ? 'See who has each code. Assignment, email delivery and redemption are separate.'
-            : undefined
+            : section === 'events'
+              ? 'Manage event drafts, publication and organizer access. External calendar listings are managed by their source.'
+              : undefined
         }
       >
-        {['events', 'updates'].includes(section) && (
+        {!editorId && ['events', 'updates'].includes(section) && (
           <Button onClick={() => navigate({ id: 'new' })}>
             New {section === 'events' ? 'event' : 'update'}
           </Button>
         )}
       </PageHeader>
       <ErrorMessage error={error} retry={load} />
+      {editorId && error && !data && (
+        <Link className="btn" href={path}>
+          Back to {section}
+        </Link>
+      )}
       {notice && (
         <p role="status" className="member-notice">
           {notice}
@@ -278,6 +327,11 @@ export default function AdminScreen({ section }: { section: string }) {
                   />
                 </label>
                 <Button variant="outline">Search</Button>
+                {search && (
+                  <Button type="button" variant="ghost" onClick={() => navigate({ search: '', page: '1' })}>
+                    Clear search
+                  </Button>
+                )}
               </form>
               <section className="panel table-wrap">
                 <table className="data-table">
@@ -316,13 +370,20 @@ export default function AdminScreen({ section }: { section: string }) {
                           <span className="cell-sub">{x.source}</span>
                         </td>
                         <td data-label="Delivery / redemption">
-                          Delivery unknown<span className="cell-sub">Redemption unknown</span>
+                          Delivery unknown
+                          <span className="cell-sub">Redemption unknown</span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {!data.items.length && <div className="empty">No matching assignments.</div>}
+                {!data.items.length && (
+                  <div className="empty">
+                    {search
+                      ? 'No assignments match this search. Try another email or clear the search.'
+                      : 'No codes have been assigned yet.'}
+                  </div>
+                )}
               </section>
             </>
           )}
@@ -347,6 +408,7 @@ export default function AdminScreen({ section }: { section: string }) {
                       evidence={edit?.evidence}
                       slug={edit?.slug}
                       eventId={edit?.event_id}
+                      onReload={load}
                       kind={section === 'events' ? 'event' : 'story'}
                       onSave={async (d, e, s) => {
                         await action(
@@ -364,7 +426,9 @@ export default function AdminScreen({ section }: { section: string }) {
                       }}
                     />
                   ) : (
-                    <p>Draft not on this page. Return to the list or change the page.</p>
+                    <p>
+                      Draft unavailable. It may have been removed. Return to the list to choose another draft.
+                    </p>
                   )}
                 </>
               ) : (
@@ -374,7 +438,7 @@ export default function AdminScreen({ section }: { section: string }) {
                       <tr>
                         <th>Title</th>
                         <th>Status</th>
-                        <th>Last update</th>
+                        <th>Revision</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -394,16 +458,24 @@ export default function AdminScreen({ section }: { section: string }) {
                               {x.review_status === 'submitted'
                                 ? 'Awaiting review'
                                 : x.published
-                                  ? 'Published · draft available'
+                                  ? 'Published'
                                   : 'Draft'}
                             </Status>
                           </td>
-                          <td data-label="Last update">Version {x.version}</td>
+                          <td data-label="Revision">Version {x.version}</td>
                           <td>
                             <div className="actions">
                               <Button variant="outline" size="sm" onClick={() => navigate({ id: x.id })}>
                                 Edit
                               </Button>
+                              {section === 'events' && x.event_id && (
+                                <Link
+                                  className="btn"
+                                  href={'/organizer/events/' + x.event_id + '?tab=participants'}
+                                >
+                                  Participants
+                                </Link>
+                              )}
                               <Button variant="outline" size="sm" onClick={() => setConfirmation(x)}>
                                 Review & publish
                               </Button>
@@ -543,6 +615,9 @@ export default function AdminScreen({ section }: { section: string }) {
             <>
               <ImportWizard onCommit={() => void load()} />
               <h2>Import history</h2>
+              {!data.items.length && (
+                <p className="empty">No imports yet. Start with a CSV or XLSX registration file.</p>
+              )}
               <section className="panel">
                 <table className="data-table">
                   <thead>
@@ -614,7 +689,16 @@ export default function AdminScreen({ section }: { section: string }) {
               {!data.items.length && <div className="panel empty">No queued messages.</div>}
             </>
           )}
-          {section === 'shares' && (
+          {section === 'shares' && !data.items.length && (
+            <div className="panel empty">
+              <h2>No content ready to share</h2>
+              <p>Publish a project, event or update with promotional permission first.</p>
+              <Link className="text-link" href="/admin/projects">
+                Review projects
+              </Link>
+            </div>
+          )}
+          {section === 'shares' && data.items.length > 0 && (
             <section className="panel panel-body">
               <h2>Approve exact social copy</h2>
               <p>Choose published content with promotional permission. Publishing stays manual.</p>
@@ -752,6 +836,7 @@ function RewardOffer({
   busy: boolean;
   save: (p: Record<string, string>) => Promise<unknown>;
 }) {
+  const [dirty, setDirty] = useState(false);
   const [details, setDetails] = useState({
     eligibility: '',
     value: '',
@@ -760,6 +845,21 @@ function RewardOffer({
     deadline: '',
     ...item.presentation,
   });
+  useUnsaved(dirty);
+  const labels: Record<string, string> = {
+    eligibility: 'Who can claim',
+    value: 'Reward value',
+    instructions: 'How to redeem',
+    redemption_url: 'Redemption link',
+    deadline: 'Redemption deadline',
+  };
+  const limits: Record<string, number> = {
+    eligibility: 500,
+    value: 100,
+    instructions: 2000,
+    redemption_url: 1000,
+    deadline: 100,
+  };
   return (
     <section className="panel panel-body">
       <h2>{item.title}</h2>
@@ -771,20 +871,26 @@ function RewardOffer({
         className="standard-form"
         onSubmit={(e) => {
           e.preventDefault();
-          void save(details).catch(() => {});
+          void save(details)
+            .then(() => setDirty(false))
+            .catch(() => {});
         }}
       >
-        {Object.keys(details).map((key) => (
+        {Object.keys(labels).map((key) => (
           <label key={key}>
-            {key.replaceAll('_', ' ')}
+            {labels[key] || key.replaceAll('_', ' ')}
             <input
+              maxLength={limits[key]}
               type={key === 'redemption_url' ? 'url' : 'text'}
               value={details[key as keyof typeof details]}
-              onChange={(e) => setDetails({ ...details, [key]: e.target.value })}
+              onChange={(e) => {
+                setDetails({ ...details, [key]: e.target.value });
+                setDirty(true);
+              }}
             />
           </label>
         ))}
-        <Button disabled={busy}>Save offer details</Button>
+        <Button disabled={busy || !dirty}>{busy ? 'Saving…' : 'Save offer details'}</Button>
       </form>
     </section>
   );

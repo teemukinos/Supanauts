@@ -1,9 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Papa from 'papaparse';
 import { Button, ErrorMessage, request } from './ui';
 type Sheet = { name: string; rows: string[][] };
-type Preview = { id: string; accepted: number; quarantine: { row: number; reason: string }[] };
+type Preview = {
+  id: string;
+  accepted: number;
+  quarantine: { row: number; reason: string }[];
+};
 export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
   const [sheets, setSheets] = useState<Sheet[]>([]),
     [sheet, setSheet] = useState(''),
@@ -32,6 +37,8 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
     setError('');
     setBusy(true);
     setSheets([]);
+    setSheet('');
+    setMapping({ email: '', record: '', status: '' });
     try {
       if (file.size > 2000000) throw Error('Choose a file smaller than 2 MB.');
       let parsed: Sheet[];
@@ -42,10 +49,14 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
           rows: s.data.map((row) => row.map((cell) => (cell == null ? '' : String(cell)))),
         }));
       } else if (file.name.toLowerCase().endsWith('.csv')) {
-        const csv = Papa.parse<string[]>(await file.text(), { skipEmptyLines: 'greedy' });
+        const csv = Papa.parse<string[]>(await file.text(), {
+          skipEmptyLines: 'greedy',
+        });
         if (csv.errors.length) throw Error('CSV could not be read. Check separators and quoted fields.');
         parsed = [{ name: 'CSV', rows: csv.data }];
       } else throw Error('Choose CSV or XLSX.');
+      if (!parsed.length || parsed.every((s) => s.rows.length < 2))
+        throw Error('This file has no registration rows. Include a header and at least one registration.');
       if (parsed.some((s) => s.rows.length > 5001)) throw Error('Import at most 5,000 rows per sheet.');
       setSheets(parsed);
       setSource(file.name);
@@ -129,7 +140,7 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
           {sheets.length > 0 && (
             <>
               <label>
-                Authoritative sheet
+                Worksheet to import
                 <select
                   required
                   value={sheet}
@@ -146,7 +157,7 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
                 </select>
               </label>
               <label>
-                Import source label
+                Import name
                 <input
                   required
                   maxLength={200}
@@ -181,7 +192,14 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
                 ))}
               </select>
             </label>
-            {!events.length && <p>Create an event draft in Events before importing.</p>}
+            {!events.length && (
+              <p>
+                Create an event draft before importing.{' '}
+                <Link className="text-link" href="/admin/events?id=new">
+                  Create event
+                </Link>
+              </p>
+            )}
             {(['email', 'record', 'status'] as const).map((key) => (
               <label key={key}>
                 {key === 'email'
@@ -215,7 +233,7 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
             <p>
               {Math.max(0, rows.length - 1)} rows in this sheet. Only mapped registration fields are sent.
             </p>
-            <Button disabled={!event || mapping.email === ''}>Preview import</Button>
+            <Button disabled={!event || mapping.email === '' || rows.length < 2}>Preview import</Button>
           </fieldset>
         )}
       </form>
@@ -273,7 +291,10 @@ export default function ImportWizard({ onCommit }: { onCommit: () => void }) {
               if (!confirm(`Add ${preview.accepted} registration rows from this preview?`)) return;
               setBusy(true);
               try {
-                await request('/api/community/admin', { action: 'import_commit', data: { id: preview.id } });
+                await request('/api/community/admin', {
+                  action: 'import_commit',
+                  data: { id: preview.id },
+                });
                 setPreview(null);
                 setNotice('Import committed. Membership records are ready. No codes were allocated.');
                 onCommit();

@@ -25,6 +25,11 @@ export default function MemberList({ kind }: { kind: 'events' | 'projects' }) {
   }
   useEffect(() => {
     void load();
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
   }, []);
   return (
     <main id="main">

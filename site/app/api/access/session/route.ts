@@ -6,7 +6,11 @@ export async function GET() {
     const { data, error } = await client.rpc('community_access');
     if (error)
       return json(
-        { error: 'Account access could not be checked.' },
+        {
+          error: error.message.includes('INELIGIBLE')
+            ? 'This membership is inactive or no longer matches your verified email. Contact an admin for help.'
+            : 'Account access could not be checked. Please try again.',
+        },
         error.message.includes('INELIGIBLE') ? 403 : 503,
       );
     return json(data);

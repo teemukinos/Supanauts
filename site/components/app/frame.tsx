@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Gift,
@@ -61,10 +61,12 @@ const adminLinks: [string, string, LucideIcon][] = [
 ];
 export default function AppFrame({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const searchParams = useSearchParams();
   const privatePage = /^\/(member|admin|organizer)(\/|$)/.test(path);
   const [access, setAccess] = useState<Access | null>(null),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [accessDenied, setAccessDenied] = useState('');
   const [drawer, setDrawer] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const previousAccess = useRef<Access | null>(null);
@@ -72,7 +74,9 @@ export default function AppFrame({ children }: { children: ReactNode }) {
   async function check() {
     setError('');
     try {
-      const response = await fetch('/api/access/session', { cache: 'no-store' });
+      const response = await fetch('/api/access/session', {
+        cache: 'no-store',
+      });
       const data = await response.json();
       if (response.status === 401 && previousAccess.current) {
         setExpired(true);
@@ -80,13 +84,17 @@ export default function AppFrame({ children }: { children: ReactNode }) {
       }
       if (response.status === 401 || response.status === 403) {
         setAccess(null);
+        setAccessDenied(response.status === 403 ? data.error : '');
         previousAccess.current = null;
         setExpired(false);
       } else if (!response.ok) throw Error(data.error);
       else {
+        const restoring = expired;
+        setAccessDenied('');
         setAccess(data);
         previousAccess.current = data;
         setExpired(false);
+        if (restoring) window.dispatchEvent(new Event('sessionrestored'));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -125,7 +133,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
       .at(-1)?.[1] || 'Workspace';
   useEffect(() => {
     if (privatePage) document.title = current + ' — Supanauts';
-  }, [current, privatePage]);
+  }, [current, privatePage, path, searchParams]);
   const signIn =
     '/member?next=' +
     encodeURIComponent(path + (typeof window === 'undefined' ? '' : window.location.search));
@@ -221,14 +229,29 @@ export default function AppFrame({ children }: { children: ReactNode }) {
   if (!access)
     return (
       <div className="private-surface">
-        {path === '/member' ? (
+        {path === '/member' && !accessDenied && !error ? (
           children
         ) : (
           <main id="main" className="auth-page">
             <Brand />
-            <h1>{error ? 'Account unavailable' : 'Sign in to continue'}</h1>
-            <p>{error || 'Use your registration email to open your private workspace.'}</p>
-            {error ? (
+            <h1>
+              {accessDenied
+                ? 'Account access unavailable'
+                : error
+                  ? 'Account unavailable'
+                  : 'Sign in to continue'}
+            </h1>
+            <p>{accessDenied || error || 'Use your registration email to open your private workspace.'}</p>
+            {accessDenied ? (
+              <div className="actions">
+                <Link className="btn primary" href="/help/report">
+                  Get help
+                </Link>
+                <button className="btn" onClick={logout}>
+                  Use a different email
+                </button>
+              </div>
+            ) : error ? (
               <button className="btn primary" onClick={check}>
                 Try again
               </button>

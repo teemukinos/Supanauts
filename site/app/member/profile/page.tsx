@@ -3,7 +3,11 @@ import { useEffect, useState } from 'react';
 import { Button, PageHeader, Loading, ErrorMessage, request, useUnsaved } from '../../../components/app/ui';
 type Profile = { name: string; link: string; decision_email: boolean };
 export default function Page() {
-  const [profile, setProfile] = useState<Profile>({ name: '', link: '', decision_email: true });
+  const [profile, setProfile] = useState<Profile>({
+    name: '',
+    link: '',
+    decision_email: true,
+  });
   const [notice, setNotice] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
@@ -23,6 +27,14 @@ export default function Page() {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (ready) return;
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
+  }, [ready]);
   function update(patch: Partial<Profile>) {
     setProfile((p) => ({ ...p, ...patch }));
     setDirty(true);
@@ -54,6 +66,7 @@ export default function Page() {
                 await request('/api/community/profile', profile);
                 setNotice('Preferences saved.');
                 setDirty(false);
+                window.dispatchEvent(new Event('sessionchange'));
               } catch (e) {
                 setError((e as Error).message);
               } finally {
@@ -90,11 +103,12 @@ export default function Page() {
                   checked={profile.decision_email}
                   onChange={(e) => update({ decision_email: e.target.checked })}
                 />
-                Email project moderation decisions when delivery is enabled.
+                Email me when a project review is ready.
               </label>
               <p>
-                Login and access messages remain available. This does not subscribe you to a newsletter.
-                Manage WhatsApp participation in WhatsApp.
+                Review emails are sent when community email delivery is available. Sign-in codes always remain
+                available. This does not subscribe you to a newsletter. Manage WhatsApp participation in
+                WhatsApp.
               </p>
             </fieldset>
             <div>

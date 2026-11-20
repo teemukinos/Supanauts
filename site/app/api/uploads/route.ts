@@ -10,6 +10,17 @@ import { adminClient, json, memberClient, rateLimit, sameOrigin } from '../../..
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 const exec = promisify(execFile);
+function uploadPolicy() {
+  // Keep multipart bodies below the hosting limit. Larger videos use external links.
+  const hosted = process.env.VERCEL === '1';
+  return {
+    imageMaxBytes: hosted ? 4000000 : 10485760,
+    videoMaxBytes: process.env.FFMPEG_PATH && process.env.FFPROBE_PATH ? (hosted ? 4000000 : 104857600) : 0,
+  };
+}
+export async function GET() {
+  return json(uploadPolicy());
+}
 export async function POST(req: Request) {
   let folder = '';
   try {
@@ -27,8 +38,10 @@ export async function POST(req: Request) {
     const user = await client.auth.getUser();
     if (!(await rateLimit('upload:' + user.data.user?.id, 20, 3600)))
       return json({ error: 'Upload limit reached. Try again later.' }, 429);
-    if (Number(req.headers.get('content-length')) > 105000000)
-      return json({ error: 'Maximum file size is 100 MB.' }, 413);
+    const policy = uploadPolicy();
+    const bodyLimit = Math.max(policy.imageMaxBytes, policy.videoMaxBytes) + 100000;
+    if (Number(req.headers.get('content-length')) > bodyLimit)
+      return json({ error: 'This file is too large. Choose a smaller file.' }, 413);
     // Enforce a streaming limit before parsing multipart, including chunked requests.
     const reader = req.body?.getReader();
     if (!reader) throw Error('Choose a file.');
@@ -38,9 +51,9 @@ export async function POST(req: Request) {
       const r = await reader.read();
       if (r.done) break;
       total += r.value.byteLength;
-      if (total > 105000000) {
+      if (total > bodyLimit) {
         await reader.cancel();
-        return json({ error: 'Maximum file size is 100 MB.' }, 413);
+        return json({ error: 'This file is too large. Choose a smaller file.' }, 413);
       }
       parts.push(r.value);
     }
@@ -53,7 +66,8 @@ export async function POST(req: Request) {
     let mime = 'image/webp';
     let duration: number | null = null;
     if (file.type.startsWith('image/')) {
-      if (file.size > 10485760) throw Error('Images must be 10 MB or smaller.');
+      if (file.size > policy.imageMaxBytes)
+        throw Error('Image exceeds the upload limit. Choose a smaller file.');
       const metadata = await sharp(bytes, { limitInputPixels: 40000000 }).metadata();
       if (!['jpeg', 'png', 'webp'].includes(metadata.format || '')) throw Error('Use JPEG, PNG or WebP.');
       bytes = await sharp(bytes, { limitInputPixels: 40000000 })
@@ -62,7 +76,8 @@ export async function POST(req: Request) {
         .webp({ quality: 85 })
         .toBuffer();
     } else if (file.type === 'video/mp4') {
-      if (file.size > 104857600) throw Error('Video must be 100 MB or smaller.');
+      if (file.size > policy.videoMaxBytes)
+        throw Error('Video exceeds the upload limit. Add a demo or resource link instead.');
       if (!process.env.FFMPEG_PATH || !process.env.FFPROBE_PATH)
         throw Error('Video processing is not enabled on this host. Add a demo link instead.');
       folder = await mkdtemp(join(tmpdir(), 'supanauts-media-'));

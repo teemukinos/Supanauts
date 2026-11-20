@@ -36,6 +36,14 @@ export default function Member() {
     [problem, setProblem] = useState('');
   const [member, setMember] = useState<Account | null>(null);
   const [claiming, setClaiming] = useState('');
+  const [resendAt, setResendAt] = useState(0),
+    [resendSeconds, setResendSeconds] = useState(0);
+  useEffect(() => {
+    const tick = () => setResendSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [resendAt]);
   async function refresh() {
     const response = await fetch('/api/rewards/mine', { cache: 'no-store' });
     const data = await response.json();
@@ -51,10 +59,16 @@ export default function Member() {
   }
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
-    refresh().catch(() => {
-      setProblem('Could not load your account. Please refresh.');
-      setLoading(false);
-    });
+    const restore = () => {
+      setProblem('');
+      void refresh().catch(() => {
+        setProblem('Could not load your account. Please refresh.');
+        setLoading(false);
+      });
+    };
+    restore();
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
   }, []);
   async function action(path: string, data: object) {
     const response = await fetch(path, {
@@ -72,6 +86,7 @@ export default function Member() {
   async function sendCode() {
     const result = await action('/api/auth/request', { email });
     setSent(true);
+    setResendAt(Date.now() + 60000);
     setToken('');
     setNotice(result.message);
   }
@@ -200,7 +215,19 @@ export default function Member() {
                             <span className="badge green">Assigned</span>
                           </div>
                           <CopyCode code={reward.code!} />
-                          {reward.details?.instructions && <p>{reward.details.instructions}</p>}
+                          {reward.details?.instructions ? (
+                            <p>{reward.details.instructions}</p>
+                          ) : (
+                            !reward.details?.redemption_url && (
+                              <p>
+                                Redemption instructions have not been added yet.{' '}
+                                <a className="text-link" href="/help/report">
+                                  Ask for help with this reward
+                                </a>
+                                .
+                              </p>
+                            )
+                          )}
                           {reward.details?.deadline && <p>Redeem by {reward.details.deadline}</p>}
                           <div className="reward-foot">
                             <span className="fine-print">
@@ -371,7 +398,7 @@ export default function Member() {
                   <button
                     type="button"
                     className="outline"
-                    disabled={busy}
+                    disabled={busy || resendSeconds > 0}
                     onClick={async () => {
                       setBusy(true);
                       setProblem('');
@@ -385,7 +412,7 @@ export default function Member() {
                       }
                     }}
                   >
-                    Send a new code
+                    {resendSeconds > 0 ? `Send a new code in ${resendSeconds}s` : 'Send a new code'}
                   </button>
                   <button
                     type="button"

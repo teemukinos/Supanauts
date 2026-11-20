@@ -24,6 +24,7 @@ export function safeNext(value: unknown) {
     const id = params.get(key);
     if (id && /^[a-f0-9-]{36}$/.test(id)) clean.set(key, id);
   }
+  if (params.get('id') === 'new' && ['/admin/events', '/admin/updates'].includes(path)) clean.set('id', 'new');
   const tab = params.get('tab');
   if (tab && ['overview', 'participants', 'draft'].includes(tab)) clean.set('tab', tab);
   const page = params.get('page');

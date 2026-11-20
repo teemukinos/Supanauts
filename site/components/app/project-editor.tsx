@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useUploadPolicy, uploadHelp, uploadMedia } from './upload';
 import { Media } from '../../app/media';
 import { Button, PageHeader, Loading, ErrorMessage, Modal, request, useUnsaved } from './ui';
 const blank = {
@@ -31,8 +32,10 @@ export default function ProjectEditor() {
     [events, setEvents] = useState<string[]>([]),
     [progress, setProgress] = useState<number | null>(null);
   useUnsaved(dirty);
-  useEffect(() => {
-    (async () => {
+  const uploadPolicy = useUploadPolicy();
+  async function load() {
+    setError('');
+    try {
       const data = await request<{
         projects: { id: string; revisions: { payload: Payload }[] }[];
         registrations: { event: string }[];
@@ -48,8 +51,21 @@ export default function ProjectEditor() {
       } else
         setPayload((p) => ({ ...p, maker: data.profile?.name || '', maker_link: data.profile?.link || '' }));
       setReady(true);
-    })().catch((e) => setError(e.message));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    void load();
   }, []);
+  useEffect(() => {
+    if (ready) return;
+    const restore = () => {
+      void load();
+    };
+    window.addEventListener('sessionrestored', restore);
+    return () => window.removeEventListener('sessionrestored', restore);
+  }, [ready]);
   function update<K extends keyof Payload>(key: K, value: Payload[K]) {
     setPayload((p) => ({ ...p, [key]: value }));
     setDirty(true);
@@ -79,25 +95,7 @@ export default function ProjectEditor() {
     setError('');
     setProgress(0);
     try {
-      const form = new FormData();
-      form.set('file', file);
-      const result = await new Promise<{ id: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/uploads');
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onerror = () => reject(Error('Upload interrupted. Please retry.'));
-        xhr.onload = () => {
-          try {
-            const d = JSON.parse(xhr.responseText);
-            xhr.status < 300 ? resolve(d) : reject(Error(d.error));
-          } catch {
-            reject(Error('Upload failed.'));
-          }
-        };
-        xhr.send(form);
-      });
+      const result = await uploadMedia(file, uploadPolicy, setProgress);
       update('media', [...payload.media, result.id]);
     } catch (e) {
       setError((e as Error).message);
@@ -140,7 +138,7 @@ export default function ProjectEditor() {
         title="Project draft"
         description="Share what you built or what you’re still figuring out."
       />
-      <ErrorMessage error={error} retry={!ready ? () => window.location.reload() : undefined} />
+      <ErrorMessage error={error} retry={!ready ? load : undefined} />
       {notice && (
         <p role="status" className="member-notice">
           {notice}
@@ -161,6 +159,9 @@ export default function ProjectEditor() {
               <legend>1. Project details</legend>
               {field('title', 'Project title', false, true)}
               {field('description', 'What did you build?', true, true)}
+              <p className="fineprint">
+                A title and at least 20 characters describing your project are required to save.
+              </p>
               {field('technologies', 'Technologies used')}
               <label>
                 Related event (optional)
@@ -184,10 +185,12 @@ export default function ProjectEditor() {
               {field('demo_url', 'Demo link (optional)')}
               {field('repository_url', 'Repository link (optional)')}
               <label>
-                Upload image or video
+                Attach project media
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,video/mp4"
+                  accept={
+                    'image/jpeg,image/png,image/webp' + (uploadPolicy.videoMaxBytes ? ',video/mp4' : '')
+                  }
                   disabled={progress !== null || payload.media.length >= 6}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -197,8 +200,7 @@ export default function ProjectEditor() {
                 />
               </label>
               <p className="fineprint">
-                Up to five images (10 MB each) and one MP4 (100 MB, 90 seconds). Use a demo link if video
-                processing is unavailable.
+                {uploadHelp(uploadPolicy)} Up to five images and, when available, one video.
               </p>
               {progress !== null && (
                 <p role="status">{progress === 100 ? 'Processing media…' : `Uploading ${progress}%`}</p>
@@ -262,6 +264,12 @@ export default function ProjectEditor() {
                 Preview & submit
               </Button>
             </div>
+            {!payload.display_permission && (
+              <p className="fineprint">
+                To submit for review, allow website display in the permissions section above. You can save a
+                private draft without this permission.
+              </p>
+            )}
             <p className="fineprint">
               {dirty ? 'Unsaved changes.' : 'Your draft stays private until approved.'}
             </p>
@@ -279,7 +287,7 @@ export default function ProjectEditor() {
               <Media key={mid} id={mid} title={payload.title} />
             ))}
           </div>
-          <ErrorMessage error={error} />
+          <ErrorMessage error={error} retry={!ready ? load : undefined} />
           <Button disabled={busy} onClick={() => void save(true)}>
             {busy ? 'Submitting…' : 'Submit for review'}
           </Button>
