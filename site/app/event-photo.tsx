@@ -1,9 +1,9 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
+import {eventMediaBase as base} from '../lib/event-media';
 const fallback='/illustrations/community-placeholder.svg';
 /** Event photos are supplied separately, only when their distribution is authorized. */
 export default function EventPhoto({file,alt,className,priority=false,width=1600,height=1067,thumbnail=false}:{file:string;alt:string;className?:string;priority?:boolean;width?:number;height?:number;thumbnail?:boolean}){
- const base=process.env.NEXT_PUBLIC_EVENT_MEDIA_BASE_URL?.replace(/\/$/,'');
  const [failed,setFailed]=useState(false);const image=useRef<HTMLImageElement>(null);
  const src=base&&!failed?`${base}/${file}`:fallback;
  const small=base&&!failed&&thumbnail&&file.startsWith('restored/')?`${base}/${file.replace(/\.webp$/,'-small.webp')}`:undefined;
