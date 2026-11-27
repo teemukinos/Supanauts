@@ -1,19 +1,34 @@
 # Supanauts
 
-**Meet people. Build things.** An unofficial Supabase community for builders, meetups and shared projects. Intended website: **supanauts.com**.
+**Meet people. Build things.** Supanauts is an independently organized, unofficial Supabase community for builders, meetups, and shared projects. [supanauts.com](https://supanauts.com/)
 
-This repository is private during development. Public release requires the owner's explicit approval. Supanauts is independently organized; it is not operated by or an official programme of Supabase.
+This private repository contains the community website and its database schema.
 
-## Repository status
+## Run locally
 
-The initial application is submitted through a pull request after the documentation bootstrap. The application uses Next.js, TypeScript and Supabase. Source lives in `site/`; schema migrations live in `supabase/migrations/`. See [local setup](site/README.md) for development instructions.
+Use Node.js 22 and npm.
 
-Only `teemukinos` has write access. All changes, including the owner's, go through pull requests. Community contributors will use forks once the repository is public. The initial bootstrap commit is the only pre-protection setup exception.
+```sh
+git clone https://github.com/teemukinos/Supanauts.git
+cd Supanauts/site
+npm ci
+npm run dev
+```
 
-No automatic tests, deployments or independent review workflows are installed. Local checks are documented in CONTRIBUTING.md.
+Open [http://127.0.0.1:3017](http://127.0.0.1:3017). Public pages work without credentials. For sign-in, membership, rewards, and organizer tools, follow the [application setup guide](site/README.md) using your own development services.
 
-## Licensing
+## Explore the source
 
-Original application code is licensed under Apache-2.0. Third-party logos, fonts and other assets keep their own terms; see THIRD_PARTY_NOTICES.md. The code license grants no rights to Supabase trademarks. Event photography and private member/reward data are not distributed in this repository.
+- [Application](site/app/) and [server helpers](site/lib/)
+- [Database migrations](supabase/migrations/)
+- [Community calendar](docs/calendar/README.md) and [event archive](docs/EVENT-ARCHIVE.md)
 
-See GOVERNANCE.md for merge controls and the future public-release checklist.
+## Contribute
+
+Use [GitHub Issues](https://github.com/teemukinos/Supanauts/issues) to report bugs or suggest changes. Propose code changes through a pull request against `main`. Once the repository is public, community contributors can submit pull requests from forks. The maintainer, [@teemukinos](https://github.com/teemukinos), manually squash-merges accepted pull requests. See the [contribution guide](CONTRIBUTING.md) and [governance policy](GOVERNANCE.md). Report vulnerabilities privately to the maintainer.
+
+## License
+
+Original code and illustrations use [Apache-2.0](LICENSE). Third-party assets retain their own terms. Supabase trademarks are outside the code license. See the [third-party notices](THIRD_PARTY_NOTICES.md).
+
+The repository includes editorial event listings and public SupaSquad profiles. Production credentials, private membership records, attendee exports, reward codes, and original event media stay outside Git.

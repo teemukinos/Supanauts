@@ -41,6 +41,7 @@ export default async function Home() {
                 <a className="primary" href="/join">
                   Join the community ↗
                 </a>
+                <a href="https://github.com/teemukinos/Supanauts">View source on GitHub</a>
               </div>
               <div className="hero-next">
                 {next ? (
