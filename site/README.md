@@ -52,7 +52,15 @@ Store redemption is separate from allocation. Existing allocations always remain
 
 ## Event media and branding
 
-No event photographs are included. Leave `NEXT_PUBLIC_EVENT_MEDIA_BASE_URL` unset to show the bundled illustration. A separately authorized HTTPS media location can supply the named WebP photographs; failed loads also fall back to the illustration. The variable is public and must never contain credentials or private tokens.
+Event photos, posters, and films are published separately from the code. Production Git deployments read them from a public HTTPS origin configured in Vercel through `NEXT_PUBLIC_EVENT_MEDIA_BASE_URL`. The origin must be separate from the Supanauts app. A public object store such as Vercel Blob can serve the approved files at a versioned prefix. The application needs only the public read URL.
+
+Before merging a change that switches the production origin:
+
+1. Upload only approved public event assets to the origin. Preserve paths relative to `site/public/media/`, including `restored/`, and preserve the WebP and MP4 content types. Use a new versioned prefix for replacements.
+2. Check that the published files are readable without credentials and that MP4 requests support byte ranges. Set `NEXT_PUBLIC_EVENT_MEDIA_BASE_URL` in the Vercel Production environment to the public read URL, including the versioned prefix. Keep credentials and upload tokens outside Git and out of this variable.
+3. Merge the PR only after configuring the origin. The production build rejects a missing URL, `/media`, and URLs on the app's own host. After release, play all three films and open the photo galleries on the public site.
+
+For local development, leave the variable blank for the bundled illustration or use `/media` with your own separately staged files in `site/public/media/`.
 
 Official Supabase wordmarks are unchanged assets in `public/brand/`; use white lettering on dark surfaces and black lettering on light surfaces. Preserve their separate trademark terms. Supanauts' independent identity and unofficial notice must remain visible.
 

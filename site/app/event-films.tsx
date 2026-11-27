@@ -1,6 +1,7 @@
 'use client';
 import {useRef,useState} from 'react';
 import {eventFilms} from '../lib/event-films';
+import {eventMediaBase as base} from '../lib/event-media';
 
 export default function EventFilms({initialFilm='roadshow'}:{initialFilm?:string}){
   const [selected,setSelected]=useState(Math.max(0,eventFilms.findIndex(film=>film.id===initialFilm)));
@@ -8,7 +9,6 @@ export default function EventFilms({initialFilm='roadshow'}:{initialFilm?:string
   const [error,setError]=useState(false);
   const video=useRef<HTMLVideoElement>(null);
   const film=eventFilms[selected];
-  const base=process.env.NEXT_PUBLIC_EVENT_MEDIA_BASE_URL;
   const poster=base?`${base}/${film.poster}`:'/illustrations/community-placeholder.svg';
   function choose(index:number){
     if(index===selected)return;
