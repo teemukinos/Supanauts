@@ -61,6 +61,14 @@ export default async function Home() {
             <CartoonWorld />
           </div>
         </section>
+        <section className="bd-home">
+          <div>
+            <p className="bd-label">DECEMBER 10 / 14 CITIES / 90 MINUTES</p>
+            <h2>THE WORLD IS<br /><em>BUILDING.</em></h2>
+            <p>See which city is leading and find your local Builder Day.</p>
+          </div>
+          <a className="bd-button" href="/builderday">Explore Builder Day <span aria-hidden="true">↗</span></a>
+        </section>
         <EventFilms />
         <PhotoHighlights />
         <section className="section project-invitation" id="projects">
